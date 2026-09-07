@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Unabhängiger Website-Entwurf für Die Linke – soziale Politik, klare Positionen und Möglichkeiten zum Mitmachen.">
+  <title>DIE LINKE. — Hol dir zurück, was dir gehört</title>
+  <style>
+    :root {
+      --red: #ef2348;
+      --red-dark: #b9002e;
+      --pink: #ffb5cd;
+      --paper: #f6f1e7;
+      --ink: #171311;
+      --muted: #665e58;
+      --line: rgba(23, 19, 17, .22);
+      --white: #fffdf9;
+      --max: 1240px;
+      --shadow: 0 12px 0 rgba(23, 19, 17, .12);
+    }
+    [data-theme="dark"] {
+      --red: #ff3159;
+      --red-dark: #ff7691;
+      --pink: #861a3c;
+      --paper: #171311;
+      --ink: #f6f1e7;
+      --muted: #c9c1bb;
+      --line: rgba(246, 241, 231, .24);
+      --white: #241e1b;
+      --shadow: 0 12px 0 rgba(0, 0, 0, .3);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    body.menu-open { overflow: hidden; }
+    a { color: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { font: inherit; }
+    .skip-link {
+      position: fixed; left: 1rem; top: -5rem; z-index: 100;
+      background: var(--ink); color: #fff; padding: .8rem 1rem;
+    }
+    .skip-link:focus { top: 1rem; }
+    .wrap { width: min(calc(100% - 40px), var(--max)); margin-inline: auto; }
+
+    .notice {
+      background: var(--ink); color: #fff; text-align: center;
+      padding: .45rem 1rem; font-size: .78rem; letter-spacing: .04em;
+    }
+    header {
+      position: sticky; top: 0; z-index: 20;
+      border-bottom: 2px solid var(--ink); background: rgba(246, 241, 231, .96);
+    }
+    [data-theme="dark"] header { background: rgba(23, 19, 17, .96); }
+    .nav { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+    .logo {
+      display: inline-flex; align-items: baseline; text-decoration: none;
+      font-size: 1.35rem; font-weight: 950; font-style: italic; letter-spacing: -.06em;
+    }
+    .logo-dot { color: var(--red); font-size: 1.6em; line-height: 0; }
+    nav ul { display: flex; align-items: center; gap: 1.8rem; list-style: none; margin: 0; padding: 0; }
+    nav a { text-decoration: none; font-weight: 800; font-size: .9rem; }
+    nav a:not(.button):hover { text-decoration: underline 3px var(--red); text-underline-offset: 5px; }
+    .button {
+      display: inline-flex; min-height: 46px; align-items: center; justify-content: center;
+      gap: .55rem; padding: .75rem 1rem; border: 2px solid var(--ink);
+      background: var(--red); color: #fff; text-decoration: none; font-weight: 900;
+      box-shadow: 4px 4px 0 var(--ink); transition: transform .15s, box-shadow .15s;
+    }
+    .button:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+    .button.light { background: var(--white); color: var(--ink); }
+    .button.dark { background: var(--ink); color: #fff; box-shadow: 4px 4px 0 var(--pink); }
+    .menu-button { display: none; border: 0; background: transparent; font-weight: 900; min-width: 48px; min-height: 48px; }
+    .theme-button {
+      min-width: 46px; min-height: 46px; padding: .55rem .75rem; border: 2px solid var(--ink);
+      background: var(--white); color: var(--ink); font-weight: 950; cursor: pointer;
+      box-shadow: 3px 3px 0 var(--ink); transition: transform .15s, box-shadow .15s;
+    }
+    .theme-button:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink); }
+
+    .hero { overflow: hidden; border-bottom: 2px solid var(--ink); }
+    .hero-grid { min-height: 660px; display: grid; grid-template-columns: 1.3fr .7fr; }
+    .hero-copy { padding: clamp(4rem, 8vw, 8rem) 4rem 5rem 0; align-self: center; }
+    .alarm {
+      display: inline-block; margin: 0 0 1.25rem; padding: .35rem .65rem;
+      border: 2px solid var(--ink); background: var(--pink); font-size: .8rem;
+      font-weight: 950; letter-spacing: .12em; text-transform: uppercase;
+      transform: rotate(-2deg); box-shadow: 3px 3px 0 var(--ink);
+    }
+    .eyebrow { margin: 0 0 1rem; font-size: .8rem; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+    h1, h2, h3, p { text-wrap: pretty; }
+    h1 {
+      margin: 0; max-width: 900px; font-size: clamp(4.4rem, 9.6vw, 9rem);
+      line-height: .82; letter-spacing: -.075em; font-weight: 950; text-transform: uppercase;
+    }
+    h1 span { color: var(--red); }
+    .hero-lede { max-width: 600px; margin: 2rem 0; font-size: clamp(1.15rem, 2vw, 1.45rem); font-weight: 700; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 1rem; }
+    .hero-art {
+      position: relative; min-height: 500px; background: var(--red); border-left: 2px solid var(--ink);
+      display: grid; place-items: center; isolation: isolate;
+    }
+    .hero-art::before, .hero-art::after {
+      content: ""; position: absolute; border: 3px solid var(--ink); background: var(--pink); z-index: -1;
+    }
+    .hero-art::before { width: 72%; aspect-ratio: 1; border-radius: 50%; transform: translate(-16%, -18%); }
+    .hero-art::after { width: 58%; height: 70%; right: -12%; bottom: -12%; background: var(--paper); transform: rotate(17deg); }
+    .poster {
+      width: min(77%, 390px); background: var(--white); border: 3px solid var(--ink);
+      box-shadow: 16px 16px 0 var(--ink); transform: rotate(-5deg); padding: 2rem;
+      text-transform: uppercase;
+    }
+    .poster small { display: block; font-weight: 900; letter-spacing: .12em; }
+    .poster strong { display: block; margin-top: 2rem; font-size: clamp(3rem, 6vw, 6.4rem); line-height: .82; letter-spacing: -.07em; }
+    .poster .bar { height: 12px; margin-top: 2rem; background: var(--red); }
+    .poster-stamp {
+      position: absolute; right: 3%; top: 8%; width: 145px; aspect-ratio: 1;
+      display: grid; place-items: center; border: 5px solid var(--ink); border-radius: 50%;
+      background: #ffe600; color: var(--ink); font-size: 1.05rem; font-weight: 950;
+      line-height: 1; text-align: center; text-transform: uppercase; transform: rotate(12deg);
+    }
+    [data-theme="dark"] .poster { background: #f6f1e7; color: #171311; border-color: #f6f1e7; box-shadow: 16px 16px 0 #050403; }
+    [data-theme="dark"] .poster-stamp { color: #171311; border-color: #171311; }
+
+    .ticker { border-bottom: 2px solid var(--ink); background: var(--pink); overflow: hidden; }
+    .ticker-track { width: max-content; padding: .75rem 0; font-weight: 950; text-transform: uppercase; letter-spacing: .04em; animation: move 24s linear infinite; }
+    @keyframes move { to { transform: translateX(-50%); } }
+
+    section { border-bottom: 2px solid var(--ink); }
+    .section-pad { padding: clamp(4rem, 8vw, 7rem) 0; }
+    .section-head { display: grid; grid-template-columns: .42fr 1fr; gap: 3rem; align-items: start; margin-bottom: 3.5rem; }
+    .section-head h2 { margin: 0; font-size: clamp(2.8rem, 6vw, 5.8rem); line-height: .9; letter-spacing: -.06em; text-transform: uppercase; }
+    .section-head p { margin: .5rem 0 0; max-width: 580px; font-size: 1.15rem; font-weight: 700; }
+
+    .positions { background: var(--white); }
+    .position-list { border-top: 2px solid var(--ink); }
+    .position {
+      display: grid; grid-template-columns: 100px 1fr 44px; gap: 1.5rem; align-items: center;
+      padding: 1.7rem 0; border-bottom: 2px solid var(--ink); text-decoration: none;
+      transition: padding .2s, background .2s;
+    }
+    .position:hover { padding-inline: 1rem; background: var(--pink); }
+    .position-num { color: var(--red); font-size: 1rem; font-weight: 950; }
+    .position h3 { margin: 0 0 .3rem; font-size: clamp(1.6rem, 3.5vw, 3rem); line-height: 1; letter-spacing: -.04em; }
+    .position p { margin: 0; color: var(--muted); max-width: 760px; }
+    .arrow { font-size: 2rem; font-weight: 900; }
+
+    .quote-band { background: var(--red); color: #fff; }
+    .quote-band { position: relative; overflow: hidden; }
+    .quote-band::after {
+      content: "SOLIDARITÄT"; position: absolute; right: -2rem; bottom: -1.8rem;
+      color: rgba(23,19,17,.16); font-size: clamp(5rem, 16vw, 15rem); font-weight: 950;
+      line-height: .75; letter-spacing: -.08em; transform: rotate(-4deg); pointer-events: none;
+    }
+    blockquote { margin: 0; padding: clamp(4rem, 8vw, 8rem) 0; }
+    blockquote p { margin: 0; max-width: 1100px; font-size: clamp(2.7rem, 7vw, 6.7rem); font-weight: 950; line-height: .92; letter-spacing: -.06em; }
+    blockquote footer { margin-top: 2rem; font-weight: 900; }
+
+    .action-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 4rem; align-items: start; }
+    .action-copy h2 { margin: 0; font-size: clamp(3.2rem, 7vw, 7rem); line-height: .84; letter-spacing: -.07em; text-transform: uppercase; }
+    .action-copy h2 span { color: var(--red); }
+    .action-copy p { max-width: 520px; font-size: 1.15rem; font-weight: 700; }
+    .steps { counter-reset: steps; border-top: 2px solid var(--ink); }
+    .step { counter-increment: steps; display: grid; grid-template-columns: 50px 1fr; gap: 1rem; padding: 1.5rem 0; border-bottom: 2px solid var(--ink); }
+    .step::before { content: "0" counter(steps); color: var(--red); font-weight: 950; }
+    .step h3 { margin: 0 0 .3rem; font-size: 1.4rem; }
+    .step p { margin: 0; color: var(--muted); }
+
+    footer.site-footer { background: var(--ink); color: #fff; padding: 4rem 0 2rem; }
+    [data-theme="dark"] footer.site-footer { background: #080605; color: #fff; }
+    [data-theme="dark"] .notice { background: #080605; color: #fff; }
+    [data-theme="dark"] .button.dark { background: #f6f1e7; color: #171311; }
+    .footer-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 3rem; }
+    .footer-logo { font-size: clamp(3rem, 7vw, 7rem); line-height: .85; letter-spacing: -.07em; font-weight: 950; font-style: italic; }
+    .site-footer h3 { color: var(--pink); margin-top: 0; }
+    .site-footer ul { list-style: none; padding: 0; margin: 0; }
+    .site-footer li { margin: .55rem 0; }
+    .site-footer a:hover { color: var(--pink); }
+    .fineprint { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid #615a56; color: #c9c1bb; font-size: .8rem; }
+
+    :focus-visible { outline: 4px solid #228cff; outline-offset: 4px; }
+
+    @media (max-width: 850px) {
+      .wrap { width: min(calc(100% - 28px), var(--max)); }
+      .menu-button { display: block; }
+      nav {
+        display: none; position: fixed; inset: 117px 0 0; background: var(--paper);
+        padding: 2rem 1rem; border-top: 2px solid var(--ink);
+      }
+      nav.open { display: block; }
+      nav ul { align-items: stretch; flex-direction: column; gap: 0; }
+      nav a { display: flex; align-items: center; min-height: 62px; font-size: 1.35rem; border-bottom: 2px solid var(--ink); }
+      nav .button { margin-top: 1rem; }
+      nav .theme-button { width: 100%; margin-top: 1rem; }
+      .hero-grid { grid-template-columns: 1fr; }
+      .hero-copy { padding: 4rem 0; }
+      .hero-art { border-left: 0; border-top: 2px solid var(--ink); min-height: 520px; }
+      .section-head, .action-grid { grid-template-columns: 1fr; gap: 2rem; }
+      .position { grid-template-columns: 48px 1fr 32px; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .footer-grid > :first-child { grid-column: 1 / -1; }
+    }
+    @media (max-width: 520px) {
+      h1 { font-size: clamp(3.5rem, 19vw, 5.5rem); }
+      .hero-actions .button { width: 100%; }
+      .hero-art { min-height: 430px; }
+      .poster-stamp { width: 105px; right: 1%; top: 5%; font-size: .78rem; }
+      .position { grid-template-columns: 35px 1fr; gap: .7rem; }
+      .position .arrow { display: none; }
+      .position p { font-size: .92rem; }
+      .footer-grid { grid-template-columns: 1fr; }
+      .footer-grid > :first-child { grid-column: auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Zum Inhalt springen</a>
+  <div class="notice">Unabhängiger Designentwurf · keine offizielle Website der Partei Die Linke</div>
+  <header>
+    <div class="wrap nav">
+      <a class="logo" href="#top" aria-label="Die Linke – Startseite">DIE LINKE<span class="logo-dot">.</span></a>
+      <button class="menu-button" aria-expanded="false" aria-controls="main-nav">Menü</button>
+      <nav id="main-nav" aria-label="Hauptnavigation">
+        <ul>
+          <li><a href="#positionen">Positionen</a></li>
+          <li><a href="#mitmachen">Mitmachen</a></li>
+          <li><a href="https://www.die-linke.de/partei/" target="_blank" rel="noreferrer">Partei ↗</a></li>
+          <li><button class="theme-button" type="button" aria-label="Dunkelmodus einschalten" title="Farbschema wechseln">Dunkel</button></li>
+          <li><a class="button" href="https://www.die-linke.de/mitmachen/mitglied-werden/" target="_blank" rel="noreferrer">Mitglied werden</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <p class="alarm">Genug ist genug.</p>
+          <h1>Hol dir <span>dein Leben zurück.</span></h1>
+          <p class="hero-lede">Du arbeitest. Du zahlst. Andere kassieren. Schluss damit: Wir holen Mieten runter, Löhne rauf und die Macht zurück zu denen, die dieses Land jeden Tag am Laufen halten.</p>
+          <div class="hero-actions">
+            <a class="button" href="#positionen">Wofür wir kämpfen ↓</a>
+            <a class="button light" href="#mitmachen">Jetzt organisieren</a>
+          </div>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="poster"><small>Sie nennen es Krise.</small><strong>Wir nennen es Klassenfrage.</strong><div class="bar"></div></div>
+          <div class="poster-stamp">Nicht<br>betteln.<br>Kämpfen.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker-track">Keinen Cent den Miethaien&nbsp; ◆ &nbsp;Löhne rauf&nbsp; ◆ &nbsp;Milliardäre zur Kasse&nbsp; ◆ &nbsp;Frieden statt Profite&nbsp; ◆ &nbsp;Keinen Cent den Miethaien&nbsp; ◆ &nbsp;Löhne rauf&nbsp; ◆ &nbsp;Milliardäre zur Kasse&nbsp; ◆ &nbsp;Frieden statt Profite&nbsp; ◆ &nbsp;</div>
+    </div>
+
+    <section class="positions section-pad" id="positionen">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">Vier klare Ansagen</p>
+          <div><h2>Die da oben nehmen. Wir holen zurück.</h2><p>Geld ist genug da. Es liegt auf den Konten derer, die an steigenden Mieten, niedrigen Löhnen und Krisen verdienen. Zeit, die Rechnung umzudrehen.</p></div>
+        </div>
+        <div class="position-list">
+          <a class="position" href="https://www.die-linke.de/themen/mieten/" target="_blank" rel="noreferrer"><span class="position-num">01</span><div><h3>Bezahlbar wohnen</h3><p>Bundesweiter Mietendeckel, mehr öffentlicher und genossenschaftlicher Wohnungsbau und Schutz vor Verdrängung.</p></div><span class="arrow" aria-hidden="true">↗</span></a>
+          <a class="position" href="https://www.die-linke.de/themen/steuern/" target="_blank" rel="noreferrer"><span class="position-num">02</span><div><h3>Reichtum gerecht verteilen</h3><p>Starke Schultern tragen mehr: für gute Schulen, Krankenhäuser, Bus und Bahn – überall im Land.</p></div><span class="arrow" aria-hidden="true">↗</span></a>
+          <a class="position" href="https://www.die-linke.de/themen/arbeit/" target="_blank" rel="noreferrer"><span class="position-num">03</span><div><h3>Gute Arbeit, gute Löhne</h3><p>Tarifbindung stärken, Arbeitszeit gerecht verteilen und Beschäftigte wirksam vor Ausbeutung schützen.</p></div><span class="arrow" aria-hidden="true">↗</span></a>
+          <a class="position" href="https://www.die-linke.de/themen/frieden/" target="_blank" rel="noreferrer"><span class="position-num">04</span><div><h3>Frieden durch Diplomatie</h3><p>Zivile Konfliktlösung, internationale Zusammenarbeit und Sicherheit ohne globale Aufrüstungsspirale.</p></div><span class="arrow" aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="quote-band">
+      <div class="wrap"><blockquote><p>Allein machen sie dich fertig. Gemeinsam drehen wir die Verhältnisse um.</p><footer>— Solidarität ist unsere stärkste Waffe</footer></blockquote></div>
+    </section>
+
+    <section class="section-pad" id="mitmachen">
+      <div class="wrap action-grid">
+        <div class="action-copy"><p class="eyebrow">Nicht länger zuschauen</p><h2>Wut wird <span>Widerstand.</span></h2><p>Sie setzen darauf, dass du dich machtlos fühlst. Beweise ihnen das Gegenteil: Schließ dich mit anderen zusammen und werde dort laut, wo du lebst.</p><a class="button dark" href="https://www.die-linke.de/mitmachen/" target="_blank" rel="noreferrer">Sei dabei ↗</a></div>
+        <div class="steps">
+          <div class="step"><div><h3>Vor Ort verbinden</h3><p>Finde einen Kreisverband oder eine Initiative in deiner Nähe.</p></div></div>
+          <div class="step"><div><h3>Bei Aktionen dabei sein</h3><p>Von Haustürgesprächen bis zur Mietensprechstunde: Du entscheidest, was passt.</p></div></div>
+          <div class="step"><div><h3>Mitglied werden</h3><p>Mitentscheiden, Anträge stellen und eine starke solidarische Partei mit aufbauen.</p></div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div class="footer-logo">DIE LINKE<span class="logo-dot">.</span></div>
+        <div><h3>Entdecken</h3><ul><li><a href="#positionen">Positionen</a></li><li><a href="#mitmachen">Mitmachen</a></li><li><a href="https://www.die-linke.de/" target="_blank" rel="noreferrer">Offizielle Website ↗</a></li></ul></div>
+        <div><h3>Rechtliches</h3><ul><li><a href="https://www.die-linke.de/impressum/" target="_blank" rel="noreferrer">Impressum ↗</a></li><li><a href="https://www.die-linke.de/datenschutz/" target="_blank" rel="noreferrer">Datenschutz ↗</a></li></ul></div>
+      </div>
+      <p class="fineprint">Dieser Prototyp ist ein unabhängiger, nicht beauftragter Designentwurf. Inhalte sind verkürzt und ersetzen nicht die offiziellen Positionen. Offizielle Informationen: die-linke.de.</p>
+    </div>
+  </footer>
+
+  <script>
+    const root = document.documentElement;
+    const themeButton = document.querySelector('.theme-button');
+    const savedTheme = localStorage.getItem('linke-theme');
+    const preferredTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+
+    function applyTheme(theme) {
+      const dark = theme === 'dark';
+      root.dataset.theme = theme;
+      root.style.colorScheme = theme;
+      themeButton.textContent = dark ? 'Hell' : 'Dunkel';
+      themeButton.setAttribute('aria-label', dark ? 'Hellmodus einschalten' : 'Dunkelmodus einschalten');
+    }
+
+    applyTheme(savedTheme || preferredTheme);
+    themeButton.addEventListener('click', () => {
+      const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('linke-theme', nextTheme);
+      applyTheme(nextTheme);
+    });
+
+    const menuButton = document.querySelector('.menu-button');
+    const nav = document.querySelector('#main-nav');
+    menuButton.addEventListener('click', () => {
+      const open = !nav.classList.contains('open');
+      nav.classList.toggle('open', open);
+      document.body.classList.toggle('menu-open', open);
+      menuButton.setAttribute('aria-expanded', String(open));
+      menuButton.textContent = open ? 'Schließen' : 'Menü';
+    });
+    nav.addEventListener('click', event => {
+      if (event.target.closest('a') && nav.classList.contains('open')) menuButton.click();
+    });
+  </script>
+</body>
+</html>

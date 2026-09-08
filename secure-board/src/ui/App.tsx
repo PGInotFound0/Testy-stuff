@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import type { Board } from '../domain/boards';
 
 export interface Workspace {
@@ -19,12 +19,19 @@ export function App({ service }: { service: BoardAppService }) {
   const [selectedBoard, setSelectedBoard] = useState<Board | null>(null);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
+  const loginPending = useRef(false);
 
   useEffect(() => {
     let active = true;
     service.restore()
       .then((restored) => { if (active) setWorkspace(restored); })
-      .catch(() => { if (active) setWorkspace(null); });
+      .catch((caught) => {
+        if (active) {
+          setError(caught instanceof Error ? caught.message : 'Session restore failed');
+          setWorkspace(null);
+        }
+      });
     return () => { active = false; };
   }, [service]);
 
@@ -35,12 +42,18 @@ export function App({ service }: { service: BoardAppService }) {
   if (!workspace) {
     const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      if (loginPending.current) return;
+      loginPending.current = true;
+      setLoggingIn(true);
       setError('');
       const form = new FormData(event.currentTarget);
       try {
         setWorkspace(await service.login(String(form.get('username')), String(form.get('password'))));
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : 'Login failed');
+      } finally {
+        loginPending.current = false;
+        setLoggingIn(false);
       }
     };
 
@@ -54,7 +67,7 @@ export function App({ service }: { service: BoardAppService }) {
             <label>Matrix username<input name="username" autoComplete="username" required /></label>
             <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
             {error && <p role="alert" className="error">{error}</p>}
-            <button type="submit">Enter securely</button>
+            <button type="submit" disabled={loggingIn}>{loggingIn ? 'Signing in…' : 'Enter securely'}</button>
           </form>
           <p className="fineprint">Your password is sent only to the configured Matrix homeserver for login. Session credentials are kept in this origin's IndexedDB, not localStorage.</p>
         </section>
@@ -100,7 +113,7 @@ export function App({ service }: { service: BoardAppService }) {
       </header>
       <aside aria-label="Private boards">
         <h1>BOARDS</h1>
-        <p className="section-note">Joined private rooms</p>
+        <p className="section-note">Joined invite-only rooms</p>
         <nav>
           {workspace.boards.map((board) => (
             <button key={board.id} className={selectedBoard?.id === board.id ? 'active' : ''} onClick={() => setSelectedBoard(board)}>
@@ -121,7 +134,7 @@ export function App({ service }: { service: BoardAppService }) {
               <button disabled={sending || !selectedBoard.encrypted}>{selectedBoard.encrypted ? (sending ? 'Sending…' : 'Publish encrypted') : 'Encryption required'}</button>
             </form>
           </>
-        ) : <div className="select-board"><p className="eyebrow">NO BOARD SELECTED</p><h2>CHOOSE A PRIVATE ROOM</h2><p>Your joined private Matrix rooms appear at left.</p></div>}
+        ) : <div className="select-board"><p className="eyebrow">NO BOARD SELECTED</p><h2>CHOOSE A PRIVATE ROOM</h2><p>Your joined invite-only Matrix rooms appear at left.</p></div>}
       </section>
     </main>
   );

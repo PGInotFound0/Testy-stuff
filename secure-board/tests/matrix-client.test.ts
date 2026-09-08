@@ -58,9 +58,17 @@ describe('initializeMatrixClient', () => {
 });
 
 describe('MatrixBoardGateway', () => {
+  const privateRoom = (membership = 'join', joinRule = 'invite') => ({
+    getMyMembership: () => membership,
+    currentState: {
+      getStateEvents: () => ({ getContent: () => ({ join_rule: joinRule }) }),
+    },
+  });
+
   it('refuses to send into an unencrypted room', async () => {
     const sendEvent = vi.fn();
     const client = {
+      getRoom: () => privateRoom(),
       getCrypto: () => ({ isEncryptionEnabledInRoom: vi.fn().mockResolvedValue(false) }),
       sendEvent,
     };
@@ -71,9 +79,28 @@ describe('MatrixBoardGateway', () => {
     expect(sendEvent).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['leave', 'invite'],
+    ['join', 'restricted'],
+    ['join', 'knock_restricted'],
+  ])('revalidates membership %s and join rule %s immediately before sending', async (membership, joinRule) => {
+    const sendEvent = vi.fn();
+    const client = {
+      getRoom: () => privateRoom(membership, joinRule),
+      getCrypto: () => ({ isEncryptionEnabledInRoom: vi.fn().mockResolvedValue(true) }),
+      sendEvent,
+    };
+    const gateway = new MatrixBoardGateway(client);
+
+    await expect(gateway.sendPost('!changed:example.org', 'Secret plan'))
+      .rejects.toThrow('This room is not an invite-only joined board');
+    expect(sendEvent).not.toHaveBeenCalled();
+  });
+
   it('sends replies as Matrix thread events in encrypted rooms', async () => {
     const sendEvent = vi.fn().mockResolvedValue({ event_id: '$reply' });
     const client = {
+      getRoom: () => privateRoom(),
       getCrypto: () => ({ isEncryptionEnabledInRoom: vi.fn().mockResolvedValue(true) }),
       sendEvent,
     };

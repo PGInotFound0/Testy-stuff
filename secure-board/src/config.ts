@@ -21,6 +21,10 @@ export async function loadRuntimeConfig(fetcher: ConfigFetcher = fetch): Promise
   if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && localDevelopment)) {
     throw new Error('Homeserver URL must use HTTPS');
   }
+  if (parsed.search || parsed.hash) {
+    throw new Error('Homeserver URL cannot contain a query or hash');
+  }
 
-  return { homeserverUrl: parsed.origin };
+  const path = parsed.pathname.replace(/\/+$/, '');
+  return { homeserverUrl: `${parsed.origin}${path}` };
 }

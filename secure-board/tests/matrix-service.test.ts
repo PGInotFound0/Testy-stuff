@@ -14,6 +14,24 @@ describe('MatrixBoardService session restore', () => {
     expect(createClient).not.toHaveBeenCalled();
   });
 
+  it('clears an invalid saved session when restore connection fails', async () => {
+    const connectionError = new Error('Stored Matrix session is invalid');
+    const client = {
+      initRustCrypto: vi.fn().mockRejectedValue(connectionError),
+      on: vi.fn(), off: vi.fn(), startClient: vi.fn(), stopClient: vi.fn(),
+      getRooms: () => [], getRoom: vi.fn(), getCrypto: vi.fn(), sendEvent: vi.fn(), logout: vi.fn(), login: vi.fn(),
+    };
+    const store = {
+      load: vi.fn().mockResolvedValue({ accessToken: 'bad-token', userId: '@u:example.org', deviceId: 'D' }),
+      save: vi.fn(), clear: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new MatrixBoardService('https://matrix.example.org', store, vi.fn(() => client));
+
+    await expect(service.restore()).rejects.toBe(connectionError);
+    expect(store.clear).toHaveBeenCalledOnce();
+    expect(client.stopClient).toHaveBeenCalledOnce();
+  });
+
   it('restores credentials into a Rust-crypto client and maps its private rooms', async () => {
     let syncListener: ((state: string) => void) | undefined;
     const room = {
@@ -32,6 +50,7 @@ describe('MatrixBoardService session restore', () => {
       startClient: vi.fn(async () => { syncListener?.('PREPARED'); }),
       stopClient: vi.fn(),
       getRooms: () => [room],
+      getRoom: vi.fn(),
       getCrypto: vi.fn(),
       sendEvent: vi.fn(),
       logout: vi.fn(),
@@ -63,7 +82,7 @@ describe('MatrixBoardService session restore', () => {
       initRustCrypto: vi.fn().mockResolvedValue(undefined),
       on: vi.fn((_event: string, listener: (state: string) => void) => { syncListener = listener; }),
       off: vi.fn(), startClient: vi.fn(async () => { syncListener?.('PREPARED'); }), stopClient: vi.fn(),
-      getRooms: () => [], getCrypto: vi.fn(), sendEvent: vi.fn(), logout: vi.fn(), login: vi.fn(),
+      getRooms: () => [], getRoom: vi.fn(), getCrypto: vi.fn(), sendEvent: vi.fn(), logout: vi.fn(), login: vi.fn(),
     };
     const createClient = vi.fn()
       .mockReturnValueOnce(authClient)
@@ -84,6 +103,27 @@ describe('MatrixBoardService session restore', () => {
     });
   });
 
+  it('fails closed when login is submitted concurrently', async () => {
+    let failLogin: ((error: Error) => void) | undefined;
+    const authClient = {
+      login: vi.fn(() => new Promise<never>((_, reject) => { failLogin = reject; })),
+      logout: vi.fn(),
+      initRustCrypto: vi.fn(), startClient: vi.fn(), stopClient: vi.fn(), on: vi.fn(), off: vi.fn(),
+      getRooms: () => [], getRoom: vi.fn(), getCrypto: vi.fn(), sendEvent: vi.fn(),
+    };
+    const createClient = vi.fn(() => authClient);
+    const store = { load: vi.fn(), save: vi.fn(), clear: vi.fn() };
+    const service = new MatrixBoardService('https://matrix.example.org', store, createClient);
+
+    const firstLogin = service.login('new', 'password');
+    await expect(service.login('new', 'password')).rejects.toThrow('Matrix login already in progress');
+    expect(authClient.login).toHaveBeenCalledOnce();
+    expect(createClient).toHaveBeenCalledOnce();
+
+    failLogin?.(new Error('cancel test login'));
+    await expect(firstLogin).rejects.toThrow('cancel test login');
+  });
+
   it('clears and best-effort revokes a newly saved session when crypto connection fails', async () => {
     const connectionError = new Error('Rust crypto failed');
     const authClient = {
@@ -93,7 +133,7 @@ describe('MatrixBoardService session restore', () => {
     const connectedClient = {
       initRustCrypto: vi.fn().mockRejectedValue(connectionError),
       on: vi.fn(), off: vi.fn(), startClient: vi.fn().mockResolvedValue(undefined), stopClient: vi.fn(),
-      getRooms: () => [], getCrypto: vi.fn(), sendEvent: vi.fn(), logout: vi.fn(), login: vi.fn(),
+      getRooms: () => [], getRoom: vi.fn(), getCrypto: vi.fn(), sendEvent: vi.fn(), logout: vi.fn(), login: vi.fn(),
     };
     const createClient = vi.fn()
       .mockReturnValueOnce(authClient)
@@ -107,6 +147,39 @@ describe('MatrixBoardService session restore', () => {
     expect(connectedClient.stopClient).toHaveBeenCalledOnce();
   });
 
+  it('starts the initial-sync listener only after crypto initialization and before startClient', async () => {
+    const calls: string[] = [];
+    let finishCrypto: (() => void) | undefined;
+    let syncListener: ((state: string) => void) | undefined;
+    const client = {
+      initRustCrypto: vi.fn(() => {
+        calls.push('crypto');
+        return new Promise<void>((resolve) => { finishCrypto = resolve; });
+      }),
+      on: vi.fn((_event: string, listener: (state: string) => void) => {
+        calls.push('listen');
+        syncListener = listener;
+      }),
+      off: vi.fn(),
+      startClient: vi.fn(async () => { calls.push('start'); syncListener?.('PREPARED'); }),
+      stopClient: vi.fn(), getRooms: () => [], getRoom: vi.fn(), getCrypto: vi.fn(),
+      sendEvent: vi.fn(), logout: vi.fn(), login: vi.fn(),
+    };
+    const store = {
+      load: vi.fn().mockResolvedValue({ accessToken: 'token', userId: '@u:example.org', deviceId: 'D' }),
+      save: vi.fn(), clear: vi.fn(),
+    };
+    const service = new MatrixBoardService('https://matrix.example.org', store, vi.fn(() => client));
+
+    const restore = service.restore();
+    await vi.waitFor(() => expect(client.initRustCrypto).toHaveBeenCalled());
+    expect(calls).toEqual(['crypto']);
+
+    finishCrypto?.();
+    await expect(restore).resolves.toEqual({ userId: '@u:example.org', boards: [] });
+    expect(calls).toEqual(['crypto', 'listen', 'start']);
+  });
+
   it('waits for PREPARED instead of treating SYNCING as initial-sync completion', async () => {
     let syncListener: ((state: string) => void) | undefined;
     const client = {
@@ -114,7 +187,7 @@ describe('MatrixBoardService session restore', () => {
       on: vi.fn((_event: string, listener: (state: string) => void) => { syncListener = listener; }),
       off: vi.fn(),
       startClient: vi.fn(async () => { syncListener?.('SYNCING'); }),
-      stopClient: vi.fn(), getRooms: () => [], getCrypto: vi.fn(), sendEvent: vi.fn(), logout: vi.fn(), login: vi.fn(),
+      stopClient: vi.fn(), getRooms: () => [], getRoom: vi.fn(), getCrypto: vi.fn(), sendEvent: vi.fn(), logout: vi.fn(), login: vi.fn(),
     };
     const store = {
       load: vi.fn().mockResolvedValue({ accessToken: 'token', userId: '@u:example.org', deviceId: 'D' }),
@@ -140,7 +213,7 @@ describe('MatrixBoardService session restore', () => {
       on: vi.fn((_event: string, listener: (state: string) => void) => { syncListener = listener; }),
       off: vi.fn(), startClient: vi.fn(async () => { syncListener?.('PREPARED'); }),
       stopClient: vi.fn(),
-      getRooms: () => [], getCrypto: vi.fn(), sendEvent: vi.fn(),
+      getRooms: () => [], getRoom: vi.fn(), getCrypto: vi.fn(), sendEvent: vi.fn(),
       logout: vi.fn().mockRejectedValue(logoutError), login: vi.fn(),
     };
     const store = {

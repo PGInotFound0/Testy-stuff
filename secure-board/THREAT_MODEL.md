@@ -8,9 +8,9 @@ Protect message contents between Matrix devices by relying on Matrix's reviewed 
 
 - A passive network observer should not read TLS-protected traffic.
 - A homeserver storing encrypted room events should not be able to decrypt event bodies without obtaining device keys.
-- Accidental plaintext posts are blocked: immediately before every send, the client asks the SDK crypto API whether encryption is enabled in that room and refuses the send if it is not.
+- Accidental plaintext or misdirected posts are blocked: immediately before every send, the client revalidates joined membership, the `invite` join rule, and SDK encryption state, and refuses the send if any check fails.
 - Crypto state uses a distinct SDK IndexedDB store derived from the Matrix user and device IDs. The access-token session abstraction also uses IndexedDB and never writes credentials to `localStorage`.
-- Only joined, non-public rooms (`invite`, `restricted`, or `knock_restricted` join rules) are presented as boards.
+- Only joined, invite-only rooms are presented as boards. `restricted` and `knock_restricted` rooms are not treated as private because their allow rules may make them broadly accessible.
 
 ## Explicit limits
 
@@ -24,7 +24,7 @@ Matrix E2EE does not hide all metadata. Homeservers and relevant infrastructure 
 
 ### Local device and account compromise
 
-E2EE does not protect a device while it is unlocked and running hostile extensions, malware, injected scripts, or a compromised browser profile. IndexedDB data is same-origin accessible. This increment does not encrypt its session record with a user-held local secret; moving the token out of `localStorage` avoids common accidental access patterns but is not a defense against same-origin script compromise. Logging out asks the homeserver to revoke the current access token, then clears the saved session and stops the local client even if revocation fails. A token stolen before logout remains outside this client's control; revoke suspect devices through another trusted Matrix client or the homeserver.
+E2EE does not protect a device while it is unlocked and running hostile extensions, malware, injected scripts, or a compromised browser profile. IndexedDB data is same-origin accessible. Neither the access-token session record nor Matrix Rust crypto's IndexedDB state and device keys have application-level encryption with a user-held secret. Moving the token out of `localStorage` avoids common accidental access patterns, but it does not protect the token or crypto keys from same-origin script compromise. Logging out asks the homeserver to revoke the current access token, then clears the saved session and stops the local client even if revocation fails. A token stolen before logout remains outside this client's control; revoke suspect devices through another trusted Matrix client or the homeserver.
 
 ### Trust and verification gaps in this increment
 

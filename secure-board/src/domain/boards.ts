@@ -14,11 +14,9 @@ export interface Board {
   encrypted: boolean;
 }
 
-const PRIVATE_JOIN_RULES = new Set(['invite', 'restricted', 'knock_restricted']);
-
 export function mapPrivateBoards(rooms: MatrixRoomSummary[]): Board[] {
   return rooms
-    .filter((room) => room.membership === 'join' && PRIVATE_JOIN_RULES.has(room.joinRule ?? ''))
+    .filter((room) => room.membership === 'join' && room.joinRule === 'invite')
     .map((room) => ({
       id: room.roomId,
       name: room.name?.trim() || room.roomId,

@@ -16,4 +16,14 @@ describe('mapPrivateBoards', () => {
       encrypted: true,
     }]);
   });
+
+  it('excludes restricted rooms because they may be broadly accessible', () => {
+    const boards = mapPrivateBoards([
+      { roomId: '!restricted:example.org', membership: 'join', joinRule: 'restricted', encrypted: true },
+      { roomId: '!knock:example.org', membership: 'join', joinRule: 'knock_restricted', encrypted: true },
+      { roomId: '!invite:example.org', membership: 'join', joinRule: 'invite', encrypted: true },
+    ]);
+
+    expect(boards.map((board) => board.id)).toEqual(['!invite:example.org']);
+  });
 });

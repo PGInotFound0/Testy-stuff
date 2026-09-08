@@ -3,7 +3,7 @@ import type { MatrixSession, SessionStore } from '../auth/session';
 import { loginAndSaveSession } from '../auth/session';
 import { mapPrivateBoards, type MatrixRoomSummary } from '../domain/boards';
 import type { BoardAppService, Workspace } from '../ui/App';
-import { initializeMatrixClient, MatrixBoardGateway } from './client';
+import { initializeMatrixCrypto, MatrixBoardGateway } from './client';
 
 interface StateEventLike { getContent(): Record<string, unknown> }
 interface RoomLike {
@@ -21,6 +21,7 @@ interface ServiceMatrixClient {
   on(event: string, listener: (state: string) => void): void;
   off(event: string, listener: (state: string) => void): void;
   getRooms(): RoomLike[];
+  getRoom(roomId: string): RoomLike | null;
   getCrypto(): { isEncryptionEnabledInRoom(roomId: string): Promise<boolean> } | undefined;
   sendEvent(roomId: string, eventType: 'm.room.message', content: object): Promise<unknown>;
   logout(stopClient?: boolean): Promise<unknown>;
@@ -75,6 +76,7 @@ function initialSync(client: ServiceMatrixClient): { promise: Promise<void>; can
 export class MatrixBoardService implements BoardAppService {
   private client: ServiceMatrixClient | null = null;
   private gateway: MatrixBoardGateway | null = null;
+  private loginInProgress = false;
 
   constructor(
     private readonly homeserverUrl: string,
@@ -89,12 +91,14 @@ export class MatrixBoardService implements BoardAppService {
       userId: session.userId,
       deviceId: session.deviceId,
     });
-    const sync = initialSync(client);
+    let sync: ReturnType<typeof initialSync> | undefined;
     try {
-      await initializeMatrixClient(client, session);
+      await initializeMatrixCrypto(client, session);
+      sync = initialSync(client);
+      await client.startClient();
       await sync.promise;
     } catch (error) {
-      sync.cancel();
+      sync?.cancel();
       client.stopClient();
       throw error;
     }
@@ -105,10 +109,30 @@ export class MatrixBoardService implements BoardAppService {
 
   async restore(): Promise<Workspace | null> {
     const session = await this.sessions.load();
-    return session ? this.connect(session) : null;
+    if (!session) return null;
+    try {
+      return await this.connect(session);
+    } catch (error) {
+      try {
+        await this.sessions.clear();
+      } catch (clearError) {
+        throw new AggregateError([error, clearError], 'Matrix session restore cleanup failed');
+      }
+      throw error;
+    }
   }
 
   async login(username: string, password: string): Promise<Workspace> {
+    if (this.loginInProgress) throw new Error('Matrix login already in progress');
+    this.loginInProgress = true;
+    try {
+      return await this.performLogin(username, password);
+    } finally {
+      this.loginInProgress = false;
+    }
+  }
+
+  private async performLogin(username: string, password: string): Promise<Workspace> {
     const loginClient = this.clientFactory({ baseUrl: this.homeserverUrl });
     const session = await loginAndSaveSession({
       login: (user, pass) => loginClient.login('m.login.password', {

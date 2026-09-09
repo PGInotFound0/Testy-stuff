@@ -14,10 +14,12 @@ name: secure-board-synapse
 services:
   synapse:
     build:
-      # NOTE: this file is deployed with the app's Base Directory set to
-      # /synapse, so `.` is the synapse/ folder (Dockerfile, conf/,
-      # entrypoint.py). Do NOT change this to ./synapse.
-      context: .
+      # NOTE: Coolify deploys this with Base Directory `/` and compose
+      # location `/synapse/docker-compose.yml`, so the project directory is
+      # the repo root and the context must be ./synapse (Dockerfile, conf/,
+      # entrypoint.py live there). Do NOT set Base Directory to /synapse —
+      # that doubles the path (synapse/synapse) and breaks the deploy.
+      context: ./synapse
       dockerfile: Dockerfile
     image: secure-board-synapse:latest
     restart: unless-stopped

@@ -16,6 +16,12 @@ export async function loadRuntimeConfig(fetcher: ConfigFetcher = fetch): Promise
   const homeserverUrl = (value as Record<string, unknown>).homeserverUrl;
   if (typeof homeserverUrl !== 'string') throw new Error('Invalid homeserver URL');
 
+  // Fail fast when the image was built without a homeserver URL and the
+  // deployment did not replace /config.json at runtime.
+  if (homeserverUrl.trim() === 'https://replace-me.invalid') {
+    throw new Error('App is not configured: set SECURE_BOARD_HOMESERVER_URL and redeploy');
+  }
+
   const parsed = new URL(homeserverUrl);
   const localDevelopment = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
   if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && localDevelopment)) {

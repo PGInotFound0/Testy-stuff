@@ -29,7 +29,7 @@ cp public/config.example.json public/config.json
 npm run dev
 ```
 
-`/config.json` is fetched from the client origin at startup. It is intentionally not baked into a Vite environment variable, so the same static build can be configured at deployment time:
+`/config.json` is fetched from the client origin at startup. For local development it comes from the ignored `public/config.json`; production builds generate the standalone `dist/config.json` from the validated build setting described below. The value is not compiled into the JavaScript bundle.
 
 ```json
 {

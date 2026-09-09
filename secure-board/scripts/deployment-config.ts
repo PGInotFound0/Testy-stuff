@@ -16,10 +16,11 @@ export function validateProductionConfig(
   options: { allowPlaceholder?: boolean } = {},
 ): ProductionConfig {
   if (!value || typeof value !== 'object') throw new Error('Production config must be a JSON object');
-  const homeserverUrl = (value as Record<string, unknown>).homeserverUrl;
-  if (typeof homeserverUrl !== 'string' || !homeserverUrl.trim()) {
+  const rawHomeserverUrl = (value as Record<string, unknown>).homeserverUrl;
+  if (typeof rawHomeserverUrl !== 'string' || !rawHomeserverUrl.trim()) {
     throw new Error('Production homeserverUrl must be a non-empty string');
   }
+  const homeserverUrl = rawHomeserverUrl.trim();
   if (homeserverUrl === DEPLOYMENT_PLACEHOLDER) {
     if (!options.allowPlaceholder) throw new Error('Production homeserverUrl must be replaced at deployment time');
     return { homeserverUrl };

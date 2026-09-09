@@ -17,12 +17,19 @@ describe('validateProductionConfig', () => {
     expect(() => validateProductionConfig({ homeserverUrl: DEPLOYMENT_PLACEHOLDER })).toThrow(
       'must be replaced at deployment time',
     );
+    expect(() => validateProductionConfig({ homeserverUrl: ` ${DEPLOYMENT_PLACEHOLDER} ` })).toThrow(
+      'must be replaced at deployment time',
+    );
     expect(
       validateProductionConfig(
         { homeserverUrl: DEPLOYMENT_PLACEHOLDER },
         { allowPlaceholder: true },
       ),
     ).toEqual({ homeserverUrl: DEPLOYMENT_PLACEHOLDER });
+    expect(validateProductionConfig(
+      { homeserverUrl: ` ${DEPLOYMENT_PLACEHOLDER} ` },
+      { allowPlaceholder: true },
+    )).toEqual({ homeserverUrl: DEPLOYMENT_PLACEHOLDER });
   });
 
   it.each([

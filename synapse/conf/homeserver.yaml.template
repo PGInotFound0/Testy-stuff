@@ -64,4 +64,4 @@ enable_3pid_lookup: false
 expire_access_token: false
 user_ips_max_age: 7d
 
-log_config: /conf/log.config
+log_config: /data/log.config

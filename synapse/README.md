@@ -59,8 +59,9 @@ your call.
   forces new device identities; losing the DB loses accounts and rooms.
 - **Updates**: bump the image tag in `Dockerfile`, redeploy, check
   `https://<hostname>/_matrix/client/versions`.
-- **Logs**: `docker logs` / Coolify log viewer; log config is the stock
-  `/conf/log.config`.
+- **Logs**: `docker logs` / Coolify log viewer; the entrypoint writes a
+  static console-only log config to `/data/log.config` at boot (the stock
+  `/conf/log.config` is a Jinja template, not directly usable).
 - **No admin API is exposed to the board client.** Admin calls (user/token
   management) run from your machine with the shared secret or an admin
   token — never from the browser.

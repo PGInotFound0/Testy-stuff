@@ -7,6 +7,10 @@ COPY conf/homeserver.yaml.template /secure-board/homeserver.yaml.template
 COPY entrypoint.py /secure-board/entrypoint.py
 RUN chmod +x /secure-board/entrypoint.py
 
+# The entrypoint must start as root: it writes /data (root-owned on a fresh
+# named volume) and chowns it to 991:991 before /start.py drops privileges.
+USER root
+
 VOLUME ["/data"]
 EXPOSE 8008
 

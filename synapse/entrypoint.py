@@ -92,6 +92,27 @@ fd = os.open(CONFIG, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, "w") as handle:
     handle.write(rendered)
 
+# /conf/log.config in the stock image is a Jinja template, not a usable
+# logging config — pointing log_config at it crashes Synapse on boot.
+# Write a static console-only config instead.
+with open(f"{DATA}/log.config", "w") as handle:
+    handle.write(
+        """\
+version: 1
+formatters:
+  precise:
+    format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: precise
+root:
+  level: INFO
+  handlers: [console]
+disable_existing_loggers: false
+"""
+    )
+
 # Generate the ed25519 signing key if missing (stock Synapse code path).
 subprocess.run(
     [
@@ -106,5 +127,13 @@ subprocess.run(
     ],
     check=True,
 )
+
+# /start.py drops privileges to 991:991 (or $UID:$GID) via gosu when we run
+# as root, so /data must belong to that user — a fresh named volume is
+# root-owned, which otherwise crashes Synapse with permission errors.
+uid = os.environ.get("UID", "991")
+gid = os.environ.get("GID", "991")
+if os.getuid() == 0:
+    subprocess.run(["chown", "-R", f"{uid}:{gid}", DATA], check=True)
 
 os.execv("/start.py", ["/start.py", "run"])

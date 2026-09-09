@@ -26,9 +26,17 @@ Matrix E2EE does not hide all metadata. Homeservers and relevant infrastructure 
 
 E2EE does not protect a device while it is unlocked and running hostile extensions, malware, injected scripts, or a compromised browser profile. IndexedDB data is same-origin accessible. Neither the access-token session record nor Matrix Rust crypto's IndexedDB state and device keys have application-level encryption with a user-held secret. Moving the token out of `localStorage` avoids common accidental access patterns, but it does not protect the token or crypto keys from same-origin script compromise. Logging out asks the homeserver to revoke the current access token, then clears the saved session and stops the local client even if revocation fails. A token stolen before logout remains outside this client's control; revoke suspect devices through another trusted Matrix client or the homeserver.
 
+### Registration and invitations
+
+Browser account creation is deliberately limited to the public Matrix registration API. It accepts success only after this client submits the registration token, when an advertised UIAA flow's remaining stages are `m.login.registration_token` and optional `m.login.dummy`, in the advertised order and in one non-empty, unchanged UIAA session. An uncompleted terms, CAPTCHA, email, SSO, unknown stage, malformed login response, or tokenless success is rejected rather than bypassed; after any response that returns an access token, failure clears local session state and attempts remote token revocation, reporting cleanup failures with the primary error. Registration tokens and passwords are sent to the configured homeserver and must be protected like credentials. Synapse `registration_shared_secret`, admin tokens, and admin APIs must never be exposed to this static client. A board invitation targets an existing exact Matrix user ID; it is room access, not account provisioning.
+
+### Redaction is not erasure
+
+Redaction is submitted with `MatrixClient.redactEvent` and succeeds only when the homeserver's room power levels authorize it. It removes event content from the room history presented by conforming clients, but cannot erase plaintext already decrypted, copied, quoted, screenshotted, notified, logged, backed up, or retained by recipients or infrastructure. Homeserver retention and legal deletion are separate operational concerns.
+
 ### Trust and verification gaps in this increment
 
-This UI does not yet expose cross-signing, device verification, key backup/recovery, key-withheld diagnostics, or room-member/device trust indicators. Users cannot use this increment alone to authenticate other devices against key substitution. Until those flows exist, use a mature Matrix client to verify devices, inspect room membership, manage key backup, and revoke devices.
+This UI does not yet expose cross-signing, device verification, key backup/recovery, key-withheld diagnostics, room-member/device trust indicators, or historical pagination. Users cannot use this increment alone to authenticate other devices against key substitution. Until those flows exist, use a mature Matrix client to verify devices, inspect room membership, manage key backup, and revoke devices. The next trust work is verification/cross-signing and recovery UX; the next deployment work is an independently reviewed immutable build, hardened headers, reproducible release process, and separately secured Synapse operations.
 
 ## Deployment assumptions
 
@@ -37,7 +45,7 @@ This UI does not yet expose cross-signing, device verification, key backup/recov
 - Configure CSP and other hardening headers at the static host.
 - Operate Synapse separately with timely security updates, restricted registration, backups, monitoring, and appropriate retention policies.
 - Keep the application origin and Synapse administration interfaces separated; never place admin credentials in this client.
-- Ensure only one active Matrix client instance uses a given SDK crypto IndexedDB at once, as required by `matrix-js-sdk`.
+- A process-wide ownership guard prevents more than one active Matrix client instance from using a given SDK crypto IndexedDB store; clients must be stopped or disposed before ownership is released, as required by `matrix-js-sdk`.
 
 ## Not promised
 

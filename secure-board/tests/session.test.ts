@@ -22,6 +22,20 @@ describe('loginAndSaveSession', () => {
     });
     expect(save).toHaveBeenCalledWith(session);
   });
+
+  it('rejects malformed login credentials before persistence', async () => {
+    const save = vi.fn();
+    const store: SessionStore = { load: vi.fn(), save, clear: vi.fn() };
+    const auth = {
+      login: vi.fn().mockResolvedValue({
+        access_token: 'token\u0000value', user_id: '@organizer:example.org', device_id: 'DEVICE',
+      }),
+    };
+
+    await expect(loginAndSaveSession(auth, store, 'organizer', 'password'))
+      .rejects.toThrow('invalid access token');
+    expect(save).not.toHaveBeenCalled();
+  });
 });
 
 describe('IndexedDbSessionStore', () => {

@@ -1,0 +1,31 @@
+# Secure Board homeserver (Synapse) — Coolify compose deployment.
+#
+# Deploy this file as a Coolify "Docker Compose" application. It wires the
+# persistent /data volume (database, media, signing key, secrets) so there
+# is nothing to configure by hand except:
+#   SYNAPSE_SERVER_NAME — bare public hostname, e.g.
+#     synapse-abc123.79.205.122.103.sslip.io
+#   (set it in Coolify *before* the first deploy; it is permanent, baked
+#   into every user ID. PUBLIC_BASEURL defaults to https://<server name>.)
+# Then attach the Coolify domain to port 8008 with HTTPS in the UI.
+
+name: secure-board-synapse
+
+services:
+  synapse:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: secure-board-synapse:latest
+    restart: unless-stopped
+    environment:
+      SYNAPSE_SERVER_NAME: ${SYNAPSE_SERVER_NAME:?Set SYNAPSE_SERVER_NAME to the public hostname before the first deploy}
+      PUBLIC_BASEURL: ${PUBLIC_BASEURL:-}
+    volumes:
+      - synapse-data:/data
+    expose:
+      - "8008"
+
+volumes:
+  synapse-data:
+    name: synapse-data

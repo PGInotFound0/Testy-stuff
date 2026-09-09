@@ -7,21 +7,26 @@ guest access, registration by admin-minted token only.
 
 ## Deploy on Coolify
 
-1. Create a new **Application** from this repo (`PGInotFound0/Testy-stuff`,
-   branch `feat/e2ee-board-foundation`), Dockerfile at `/synapse/Dockerfile`.
-2. Coolify assigns a domain like
+**Option A — compose (recommended):** create a **Docker Compose** application
+from this repo (`PGInotFound0/Testy-stuff`, branch
+`feat/e2ee-board-foundation`) pointing at `/synapse/docker-compose.yml`.
+The `/data` volume is declared in the file. Then:
+
+1. Coolify assigns a domain like
    `https://synapse-abc123.79.205.122.103.sslip.io`. Copy the **hostname**
    (no `https://`).
-3. Set environment variables **before the first deploy**:
-   - `SYNAPSE_SERVER_NAME=<that hostname>` — permanent, becomes part of every
-     user ID (`@user:<hostname>`). Cannot change later.
-   - `PUBLIC_BASEURL=https://<that hostname>` (optional, defaults to this).
-4. Add a persistent volume mounted at `/data` (holds config, SQLite DB,
-   media, signing key, secrets — back this up).
-5. Expose port `8008` on the Coolify domain with HTTPS. Do **not** expose
+2. Set environment variable **before the first deploy**:
+   `SYNAPSE_SERVER_NAME=<that hostname>` — permanent, becomes part of every
+   user ID (`@user:<hostname>`). Cannot change later. (`PUBLIC_BASEURL`
+   defaults to `https://<that hostname>`.)
+3. Attach the Coolify domain to port `8008` with HTTPS. Do **not** expose
    8448 (no federation listener exists).
-6. Deploy. Healthy when `/health` on port 8008 returns `OK` and
+4. Deploy. Healthy when `/health` on port 8008 returns `OK` and
    `https://<hostname>/_matrix/client/versions` lists versions.
+
+**Option B — manual Dockerfile app:** same repo/branch, Dockerfile at
+`/synapse/Dockerfile`, and add the persistent volume (container path
+`/data`) plus env vars by hand as described above.
 
 ## Point the board at it
 

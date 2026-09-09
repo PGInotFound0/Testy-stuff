@@ -7,7 +7,7 @@ export interface MatrixSession {
 export interface SessionStore {
   load(): Promise<MatrixSession | null>;
   save(session: MatrixSession): Promise<void>;
-  clear(): Promise<void>;
+  clear(expected?: unknown): Promise<void>;
 }
 
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/u;
@@ -76,6 +76,19 @@ export function validateMatrixSession(value: unknown): MatrixSession {
 const SESSION_STORE = 'sessions';
 const CURRENT_SESSION = 'current';
 
+function storedValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object'
+    || Array.isArray(left) !== Array.isArray(right)) return false;
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord).sort();
+  const rightKeys = Object.keys(rightRecord).sort();
+  return leftKeys.length === rightKeys.length
+    && leftKeys.every((key, index) => key === rightKeys[index]
+      && storedValuesEqual(leftRecord[key], rightRecord[key]));
+}
+
 export class IndexedDbSessionStore implements SessionStore {
   constructor(private readonly databaseName = 'secure-board-session') {}
 
@@ -116,12 +129,20 @@ export class IndexedDbSessionStore implements SessionStore {
     }
   }
 
-  async clear(): Promise<void> {
+  async clear(expected?: unknown): Promise<void> {
     const database = await this.open();
     try {
       await new Promise<void>((resolve, reject) => {
         const transaction = database.transaction(SESSION_STORE, 'readwrite');
-        transaction.objectStore(SESSION_STORE).delete(CURRENT_SESSION);
+        const store = transaction.objectStore(SESSION_STORE);
+        if (expected === undefined) {
+          store.delete(CURRENT_SESSION);
+        } else {
+          const request = store.get(CURRENT_SESSION);
+          request.onsuccess = () => {
+            if (storedValuesEqual(request.result, expected)) store.delete(CURRENT_SESSION);
+          };
+        }
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error);
         transaction.onabort = () => reject(transaction.error);

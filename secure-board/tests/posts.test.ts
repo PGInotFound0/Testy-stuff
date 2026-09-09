@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { buildBoardPosts } from '../src/domain/posts';
 
-function event(id: string | undefined, content: unknown, timestamp = 1, options: { type?: string; redacted?: boolean; sender?: string } = {}) {
+function event(id: string | undefined, content: unknown, timestamp = 1, options: {
+  type?: string;
+  wireType?: string;
+  encrypted?: boolean;
+  redacted?: boolean;
+  sender?: string;
+} = {}) {
   return {
     getId: () => id,
     getType: () => options.type ?? 'm.room.message',
+    getWireType: () => options.wireType ?? 'm.room.encrypted',
+    isEncrypted: () => options.encrypted ?? true,
     getContent: () => content,
     getTs: () => timestamp,
     getSender: () => options.sender ?? '@alice:example.org',
@@ -13,6 +21,22 @@ function event(id: string | undefined, content: unknown, timestamp = 1, options:
 }
 
 describe('buildBoardPosts', () => {
+  it('excludes plaintext m.room.message events even when collected from an encrypted room', () => {
+    expect(buildBoardPosts([
+      event('$plaintext', { msgtype: 'm.text', body: 'Not encrypted' }, 1, {
+        wireType: 'm.room.message', encrypted: false,
+      }),
+    ])).toEqual([]);
+  });
+
+  it('includes decrypted events whose wire event was m.room.encrypted', () => {
+    expect(buildBoardPosts([
+      event('$decrypted', { msgtype: 'm.text', body: 'Encrypted on the wire' }),
+    ])).toEqual([{
+      id: '$decrypted', body: 'Encrypted on the wire', sender: '@alice:example.org', timestamp: 1, replies: [],
+    }]);
+  });
+
   it('renders ordered roots and thread replies using stable event IDs', () => {
     const events = [
       event('$reply', { msgtype: 'm.text', body: 'Reply', 'm.relates_to': { rel_type: 'm.thread', event_id: '$root', 'm.in_reply_to': { event_id: '$root' } } }, 30),

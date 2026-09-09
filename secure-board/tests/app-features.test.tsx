@@ -56,8 +56,8 @@ describe('App usable board features', () => {
     const appService = service({ restore: vi.fn().mockResolvedValue(workspace), createBoard, inviteMember });
     render(<App service={appService} />);
     await screen.findByText('Tenant Union');
-    fireEvent.change(screen.getByLabelText('Board name'), { target: { value: 'Mutual Aid' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create encrypted board' }));
+    fireEvent.change(screen.getByLabelText('Public board name'), { target: { value: 'Mutual Aid' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create E2EE-message board' }));
     expect(createBoard).toHaveBeenCalledWith('Mutual Aid');
 
     fireEvent.click(screen.getByRole('button', { name: /Tenant Union/ }));
@@ -74,8 +74,8 @@ describe('App usable board features', () => {
     render(<App service={appService} />);
     await screen.findByText('Tenant Union');
 
-    fireEvent.change(screen.getByLabelText('Board name'), { target: { value: 'Mutual Aid' } });
-    const createForm = screen.getByLabelText('Board name').closest('form')!;
+    fireEvent.change(screen.getByLabelText('Public board name'), { target: { value: 'Mutual Aid' } });
+    const createForm = screen.getByLabelText('Public board name').closest('form')!;
     act(() => {
       createForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       createForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));

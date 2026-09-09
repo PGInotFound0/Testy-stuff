@@ -4,6 +4,27 @@ vi.mock('matrix-js-sdk', () => ({ createClient: vi.fn() }));
 
 import { MatrixBoardService } from '../src/matrix/service';
 
+class TestCryptoStoreLockManager {
+  private readonly held = new Set<string>();
+
+  async request(
+    name: string,
+    _options: { mode: 'exclusive'; ifAvailable: true },
+    callback: (lock: object | null) => Promise<void>,
+  ): Promise<void> {
+    if (this.held.has(name)) {
+      await callback(null);
+      return;
+    }
+    this.held.add(name);
+    try {
+      await callback({ name });
+    } finally {
+      this.held.delete(name);
+    }
+  }
+}
+
 const serviceClientShell = () => ({
   initRustCrypto: vi.fn(), startClient: vi.fn(), stopClient: vi.fn(), on: vi.fn(), off: vi.fn(),
   getRooms: () => [], getRoom: vi.fn(), getCrypto: vi.fn(), sendEvent: vi.fn(),
@@ -20,8 +41,8 @@ describe('MatrixBoardService session restore', () => {
     expect(createClient).not.toHaveBeenCalled();
   });
 
-  it('clears an invalid saved session when restore connection fails', async () => {
-    const connectionError = new Error('Stored Matrix session is invalid');
+  it('preserves a valid saved session when transient crypto initialization fails', async () => {
+    const connectionError = new Error('IndexedDB crypto startup failed');
     const client = {
       initRustCrypto: vi.fn().mockRejectedValue(connectionError),
       on: vi.fn(), off: vi.fn(), startClient: vi.fn(), stopClient: vi.fn(),
@@ -34,7 +55,8 @@ describe('MatrixBoardService session restore', () => {
     const service = new MatrixBoardService('https://matrix.example.org', store, vi.fn(() => client));
 
     await expect(service.restore()).rejects.toBe(connectionError);
-    expect(store.clear).toHaveBeenCalledOnce();
+    expect(store.clear).not.toHaveBeenCalled();
+    expect(client.logout).not.toHaveBeenCalled();
     expect(client.stopClient).toHaveBeenCalledOnce();
   });
 
@@ -52,28 +74,29 @@ describe('MatrixBoardService session restore', () => {
     expect(factory).toHaveBeenCalledWith(expect.objectContaining({ accessToken: 'token', userId: '@u:example.org' }));
   });
 
-  it('aggregates restore connection, local-clear, and remote-revocation failures', async () => {
-    const connectionError = new Error('crypto failed');
+  it('aggregates malformed-session cleanup and remote-revocation failures', async () => {
     const clearError = new Error('clear failed');
     const logoutError = new Error('logout failed');
-    const connectionClient = {
-      ...serviceClientShell(), initRustCrypto: vi.fn().mockRejectedValue(connectionError),
-    };
+    const stored = { accessToken: 'token', userId: '@u:example.org', deviceId: 'D\u0000' };
     const cleanupClient = {
       ...serviceClientShell(), logout: vi.fn().mockRejectedValue(logoutError),
     };
     const store = {
-      load: vi.fn().mockResolvedValue({ accessToken: 'token', userId: '@u:example.org', deviceId: 'D' }),
+      load: vi.fn().mockResolvedValue(stored),
       save: vi.fn(), clear: vi.fn().mockRejectedValue(clearError),
     };
-    const factory = vi.fn().mockReturnValueOnce(connectionClient).mockReturnValueOnce(cleanupClient);
+    const factory = vi.fn(() => cleanupClient);
     const service = new MatrixBoardService('https://matrix.example.org', store, factory);
 
     const failure = await service.restore().catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(AggregateError);
-    expect((failure as AggregateError).errors).toEqual([connectionError, clearError, logoutError]);
+    expect((failure as AggregateError).errors).toEqual([
+      expect.objectContaining({ message: 'Matrix session has an invalid device ID' }),
+      clearError,
+      logoutError,
+    ]);
+    expect(store.clear).toHaveBeenCalledWith(stored);
     expect(cleanupClient.logout).toHaveBeenCalledOnce();
-    expect(factory).toHaveBeenNthCalledWith(2, expect.objectContaining({ accessToken: 'token', userId: '@u:example.org', deviceId: 'D' }));
   });
 
   it('restores credentials into a Rust-crypto client and maps its private rooms', async () => {
@@ -134,9 +157,9 @@ describe('MatrixBoardService session restore', () => {
     finishLoad?.({ accessToken: 'token', userId: '@late:example.org', deviceId: 'D' });
 
     await expect(restore).rejects.toThrow('Matrix authentication was disposed');
-    expect(createClient).toHaveBeenCalledOnce();
-    expect(cleanupClient.logout).toHaveBeenCalledOnce();
-    expect(store.clear).toHaveBeenCalledOnce();
+    expect(createClient).not.toHaveBeenCalled();
+    expect(cleanupClient.logout).not.toHaveBeenCalled();
+    expect(store.clear).not.toHaveBeenCalled();
   });
 
   it('serializes a StrictMode-like restore-dispose-restore sequence', async () => {
@@ -148,14 +171,13 @@ describe('MatrixBoardService session restore', () => {
         .mockResolvedValueOnce(session),
       save: vi.fn(), clear: vi.fn().mockResolvedValue(undefined),
     };
-    const cleanupClient = { ...serviceClientShell(), logout: vi.fn().mockResolvedValue(undefined) };
     let syncListener: ((state: string) => void) | undefined;
     const connectedClient = {
       ...serviceClientShell(), initRustCrypto: vi.fn().mockResolvedValue(undefined),
       on: vi.fn((_event: string, listener: (state: string) => void) => { syncListener = listener; }),
       startClient: vi.fn(async () => { syncListener?.('PREPARED'); }),
     };
-    const factory = vi.fn().mockReturnValueOnce(cleanupClient).mockReturnValueOnce(connectedClient);
+    const factory = vi.fn(() => connectedClient);
     const service = new MatrixBoardService('https://matrix.example.org', store, factory);
 
     const discardedRestore = service.restore();
@@ -212,11 +234,12 @@ describe('MatrixBoardService session restore', () => {
     const session = { accessToken: 'token', userId: '@same:example.org', deviceId: 'DEVICE' };
     const firstClient = makeClient();
     const secondClient = makeClient();
+    const locks = new TestCryptoStoreLockManager();
     const first = new MatrixBoardService('https://matrix.example.org', {
       load: vi.fn().mockResolvedValue(session), save: vi.fn(), clear: vi.fn(),
-    }, vi.fn(() => firstClient));
+    }, vi.fn(() => firstClient), locks);
     const secondStore = { load: vi.fn().mockResolvedValue(session), save: vi.fn(), clear: vi.fn() };
-    const second = new MatrixBoardService('https://matrix.example.org', secondStore, vi.fn(() => secondClient));
+    const second = new MatrixBoardService('https://matrix.example.org', secondStore, vi.fn(() => secondClient), locks);
 
     await first.restore();
     await expect(second.restore()).rejects.toThrow('Matrix crypto store is already in use');
@@ -226,6 +249,55 @@ describe('MatrixBoardService session restore', () => {
     expect(firstClient.stopClient).toHaveBeenCalledOnce();
     await expect(second.restore()).resolves.toMatchObject({ userId: '@same:example.org' });
     await second.logout();
+  });
+
+  it('fails closed before crypto initialization when Web Locks are unavailable', async () => {
+    const client = serviceClientShell();
+    const session = { accessToken: 'token', userId: '@unsupported:example.org', deviceId: 'D' };
+    const service = new MatrixBoardService('https://matrix.example.org', {
+      load: vi.fn().mockResolvedValue(session), save: vi.fn(), clear: vi.fn().mockResolvedValue(undefined),
+    }, vi.fn(() => client), null);
+
+    await expect(service.restore()).rejects.toThrow('Web Locks API is required');
+    expect(client.initRustCrypto).not.toHaveBeenCalled();
+  });
+
+  it('does not reconnect after disposal while waiting for a crypto-store lock', async () => {
+    let grantLock: (() => void) | undefined;
+    const locks = {
+      async request(
+        _name: string,
+        _options: { mode: 'exclusive'; ifAvailable: true },
+        callback: (lock: object | null) => Promise<void>,
+      ): Promise<void> {
+        await new Promise<void>((resolve) => { grantLock = resolve; });
+        await callback({});
+      },
+    };
+    let syncListener: ((state: string) => void) | undefined;
+    const client = {
+      ...serviceClientShell(),
+      initRustCrypto: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn((_event: string, listener: (state: string) => void) => { syncListener = listener; }),
+      startClient: vi.fn(async () => { syncListener?.('PREPARED'); }),
+    };
+    const session = { accessToken: 'token', userId: '@lock-wait:example.org', deviceId: 'D' };
+    const createClient = vi.fn(() => client);
+    const service = new MatrixBoardService('https://matrix.example.org', {
+      load: vi.fn().mockResolvedValue(session), save: vi.fn(), clear: vi.fn(),
+    }, createClient, locks);
+
+    const restore = service.restore();
+    await vi.waitFor(() => expect(grantLock).toBeTypeOf('function'));
+    service.dispose();
+    grantLock?.();
+    try {
+      await expect(restore).rejects.toThrow('Matrix connection was disposed');
+      expect(createClient).not.toHaveBeenCalled();
+      expect(client.initRustCrypto).not.toHaveBeenCalled();
+    } finally {
+      service.dispose();
+    }
   });
 
   it('does not leak a crypto-store claim when client creation throws', async () => {
@@ -267,12 +339,13 @@ describe('MatrixBoardService session restore', () => {
       off: vi.fn(), startClient: vi.fn(async () => { syncListener?.('PREPARED'); }), stopClient: vi.fn(),
       getRooms: () => [], getRoom: vi.fn(), getCrypto: vi.fn(), sendEvent: vi.fn(), logout: vi.fn(), login: vi.fn(),
     };
+    const locks = new TestCryptoStoreLockManager();
     const pending = new MatrixBoardService('https://matrix.example.org', {
       load: vi.fn().mockResolvedValue(session), save: vi.fn(), clear: vi.fn(),
-    }, vi.fn(() => pendingClient));
+    }, vi.fn(() => pendingClient), locks);
     const replacement = new MatrixBoardService('https://matrix.example.org', {
       load: vi.fn().mockResolvedValue(session), save: vi.fn(), clear: vi.fn(),
-    }, vi.fn(() => replacementClient));
+    }, vi.fn(() => replacementClient), locks);
 
     const pendingRestore = pending.restore();
     await vi.waitFor(() => expect(pendingClient.initRustCrypto).toHaveBeenCalledOnce());
@@ -355,6 +428,8 @@ describe('MatrixBoardService session restore', () => {
 
     finishStart?.();
     await vi.waitFor(() => expect(pendingClient.stopClient).toHaveBeenCalled());
+    await Promise.resolve();
+    await Promise.resolve();
     await expect(replacement.restore()).resolves.toMatchObject({ userId: session.userId });
     replacement.dispose();
   });
@@ -364,7 +439,7 @@ describe('MatrixBoardService session restore', () => {
     const pendingClient = {
       ...serviceClientShell(), initRustCrypto: vi.fn(() => new Promise<void>(() => undefined)),
     };
-    const restoreCleanupClient = { ...serviceClientShell(), logout: vi.fn().mockResolvedValue(undefined) };
+
     const loginClient = {
       ...serviceClientShell(),
       login: vi.fn().mockResolvedValue({ access_token: 'token', user_id: session.userId, device_id: 'D' }),
@@ -379,7 +454,6 @@ describe('MatrixBoardService session restore', () => {
     };
     const factory = vi.fn()
       .mockReturnValueOnce(pendingClient)
-      .mockReturnValueOnce(restoreCleanupClient)
       .mockReturnValueOnce(loginClient)
       .mockReturnValueOnce(collidingClient);
     const service = new MatrixBoardService('https://matrix.example.org', store, factory);
@@ -611,12 +685,11 @@ describe('MatrixBoardService session restore', () => {
     }
   });
 
-  it('clears and best-effort revokes a newly saved session when crypto connection fails', async () => {
+  it('preserves a newly saved login session when transient crypto connection fails', async () => {
     const connectionError = new Error('Rust crypto failed');
-    const logoutError = new Error('revocation unavailable');
     const authClient = {
       login: vi.fn().mockResolvedValue({ access_token: 'new-token', user_id: '@new:example.org', device_id: 'NEW' }),
-      logout: vi.fn().mockRejectedValue(logoutError),
+      logout: vi.fn(),
     };
     const connectedClient = {
       initRustCrypto: vi.fn().mockRejectedValue(connectionError),
@@ -629,11 +702,9 @@ describe('MatrixBoardService session restore', () => {
     const store = { load: vi.fn(), save: vi.fn(), clear: vi.fn().mockResolvedValue(undefined) };
     const service = new MatrixBoardService('https://matrix.example.org', store, createClient);
 
-    const failure = await service.login('new', 'password').catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(AggregateError);
-    expect((failure as AggregateError).errors).toEqual([connectionError, logoutError]);
-    expect(store.clear).toHaveBeenCalledOnce();
-    expect(authClient.logout).toHaveBeenCalledOnce();
+    await expect(service.login('new', 'password')).rejects.toBe(connectionError);
+    expect(store.clear).not.toHaveBeenCalled();
+    expect(authClient.logout).not.toHaveBeenCalled();
     expect(connectedClient.stopClient).toHaveBeenCalledOnce();
   });
 
@@ -768,6 +839,68 @@ describe('MatrixBoardService session restore', () => {
     expect(store.clear).toHaveBeenCalledOnce();
     expect(authClient.logout).toHaveBeenCalledOnce();
     expect(createClient).toHaveBeenCalledOnce();
+  });
+
+  it('does not connect a registration disposed while its session is being saved', async () => {
+    const challenge = Object.assign(new Error('UIAA'), {
+      httpStatus: 401,
+      data: { session: 'uiaa-session', flows: [{ stages: ['m.login.registration_token'] }] },
+    });
+    let finishSave: (() => void) | undefined;
+    const registeredSession = { accessToken: 'registered-token', userId: '@new:example.org', deviceId: 'D' };
+    const authClient = {
+      ...serviceClientShell(),
+      registerRequest: vi.fn().mockRejectedValueOnce(challenge).mockResolvedValueOnce({
+        access_token: registeredSession.accessToken,
+        user_id: registeredSession.userId,
+        device_id: registeredSession.deviceId,
+      }),
+      setAccessToken: vi.fn(), logout: vi.fn().mockResolvedValue(undefined),
+    };
+    const store = {
+      load: vi.fn(),
+      save: vi.fn(() => new Promise<void>((resolve) => { finishSave = resolve; })),
+      clear: vi.fn().mockResolvedValue(undefined),
+    };
+    const createClient = vi.fn(() => authClient);
+    const service = new MatrixBoardService('https://matrix.example.org', store, createClient);
+
+    const registration = service.register('new', 'password', 'invite-token');
+    await vi.waitFor(() => expect(store.save).toHaveBeenCalledOnce());
+    service.dispose();
+    finishSave?.();
+
+    await expect(registration).rejects.toThrow('Matrix authentication was disposed');
+    expect(store.clear).toHaveBeenCalledWith(registeredSession);
+    expect(authClient.logout).toHaveBeenCalledOnce();
+    expect(createClient).toHaveBeenCalledOnce();
+  });
+
+  it('preserves a newly saved registration session when transient crypto connection fails', async () => {
+    const challenge = Object.assign(new Error('UIAA'), {
+      httpStatus: 401,
+      data: { session: 'uiaa-session', flows: [{ stages: ['m.login.registration_token'] }] },
+    });
+    const connectionError = new Error('Rust crypto unavailable');
+    const authClient = {
+      ...serviceClientShell(),
+      registerRequest: vi.fn().mockRejectedValueOnce(challenge).mockResolvedValueOnce({
+        access_token: 'registered-token', user_id: '@new:example.org', device_id: 'REGISTERED',
+      }),
+      setAccessToken: vi.fn(), logout: vi.fn(),
+    };
+    const connectedClient = {
+      ...serviceClientShell(), initRustCrypto: vi.fn().mockRejectedValue(connectionError),
+    };
+    const store = { load: vi.fn(), save: vi.fn(), clear: vi.fn() };
+    const service = new MatrixBoardService('https://matrix.example.org', store, vi.fn()
+      .mockReturnValueOnce(authClient).mockReturnValueOnce(connectedClient));
+
+    await expect(service.register('new', 'password', 'invite-token')).rejects.toBe(connectionError);
+    expect(store.save).toHaveBeenCalledOnce();
+    expect(store.clear).not.toHaveBeenCalled();
+    expect(authClient.logout).not.toHaveBeenCalled();
+    expect(connectedClient.stopClient).toHaveBeenCalledOnce();
   });
 
   it('rejects and revokes an unauthenticated first registration success', async () => {
@@ -969,7 +1102,7 @@ describe('MatrixBoardService session restore', () => {
     await expect(service.logout()).rejects.toBe(logoutError);
     expect(client.logout).toHaveBeenCalledWith(false);
     expect(client.stopClient).toHaveBeenCalledOnce();
-    expect(store.clear).toHaveBeenCalledOnce();
+    expect(store.clear).toHaveBeenCalledWith({ accessToken: 'token', userId: '@u:example.org', deviceId: 'D' });
     await expect(service.sendPost('!room:example.org', 'message')).rejects.toThrow('No Matrix session');
   });
 });

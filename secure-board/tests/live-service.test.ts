@@ -6,6 +6,7 @@ function message(id: string, body: unknown, relation?: object, type = 'm.room.me
   let redacted = false;
   return {
     getId: () => id, getType: () => type,
+    getWireType: () => 'm.room.encrypted', isEncrypted: () => true,
     getContent: () => ({ msgtype: 'm.text', body, ...(relation ? { 'm.relates_to': relation } : {}) }),
     getTs: () => id === '$root' ? 1 : 2, getSender: () => '@alice:example.org',
     isRedacted: () => redacted,
@@ -21,6 +22,7 @@ describe('MatrixBoardService live workspaces', () => {
     let encryptedBody = 'ciphertext';
     const encrypted = {
       getId: () => '$encrypted', getType: () => encryptedType,
+      getWireType: () => 'm.room.encrypted', isEncrypted: () => true,
       getContent: () => encryptedType === 'm.room.message' ? { msgtype: 'm.text', body: encryptedBody } : {},
       getTs: () => 3, getSender: () => '@alice:example.org', isRedacted: () => false,
     };

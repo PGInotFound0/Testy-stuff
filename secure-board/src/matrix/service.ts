@@ -4,6 +4,12 @@ import { mapPrivateBoards, type MatrixRoomSummary } from '../domain/boards';
 import { buildBoardPosts, type BoardPost, type MatrixMessageEventLike } from '../domain/posts';
 import type { BoardAppService, Workspace } from '../ui/App';
 import { cryptoDatabasePrefix, initializeMatrixCrypto, MatrixBoardGateway } from './client';
+import {
+  acquireCryptoStoreLease,
+  browserCryptoStoreLockManager,
+  type CryptoStoreLease,
+  type CryptoStoreLockManager,
+} from './crypto-store-lock';
 
 interface StateEventLike { getContent(): Record<string, unknown> }
 interface RoomLike {
@@ -132,7 +138,6 @@ async function registerWithToken(
 }
 
 const defaultFactory: MatrixClientFactory = (options) => createClient(options) as unknown as ServiceMatrixClient;
-const activeCryptoStores = new Map<string, MatrixBoardService>();
 
 function roomSummary(room: RoomLike): MatrixRoomSummary {
   const joinRule = room.currentState.getStateEvents('m.room.join_rules', '')?.getContent().join_rule;
@@ -182,7 +187,8 @@ export class MatrixBoardService implements BoardAppService {
   private authenticationInProgress: 'restore' | 'login' | 'register' | null = null;
   private authenticationGeneration = 0;
   private authenticationSettlement: Promise<void> | null = null;
-  private activeCryptoStore: string | null = null;
+  private cryptoStoreLease: CryptoStoreLease | null = null;
+  private activeSession: MatrixSession | null = null;
   private currentWorkspace: Workspace | null = null;
   private readonly subscribers = new Set<(workspace: Workspace) => void>();
   private readonly observedEvents = new Map<string, Map<string, MatrixMessageEventLike>>();
@@ -193,6 +199,7 @@ export class MatrixBoardService implements BoardAppService {
     private readonly homeserverUrl: string,
     private readonly sessions: SessionStore,
     private readonly clientFactory: MatrixClientFactory = defaultFactory,
+    private readonly cryptoStoreLocks: CryptoStoreLockManager | null = browserCryptoStoreLockManager(),
   ) {}
 
   private collectRoomEvents(room: RoomLike): MatrixMessageEventLike[] {
@@ -294,6 +301,7 @@ export class MatrixBoardService implements BoardAppService {
     this.detachLiveListeners();
     this.client = null;
     this.gateway = null;
+    this.activeSession = null;
     this.currentWorkspace = null;
     this.observedEvents.clear();
     this.ignoredBackfillIds.clear();
@@ -302,16 +310,17 @@ export class MatrixBoardService implements BoardAppService {
       try {
         client?.stopClient();
       } finally {
-        this.releaseCryptoStore();
+        void this.releaseCryptoStore();
       }
     }
   }
 
-  private releaseCryptoStore(): void {
-    if (this.activeCryptoStore && activeCryptoStores.get(this.activeCryptoStore) === this) {
-      activeCryptoStores.delete(this.activeCryptoStore);
-    }
-    this.activeCryptoStore = null;
+  private async releaseCryptoStore(): Promise<void> {
+    const lease = this.cryptoStoreLease;
+    this.cryptoStoreLease = null;
+    if (!lease) return;
+    lease.release();
+    await lease.settlement;
   }
 
   private async waitForSettlement(promise: Promise<void>): Promise<void> {
@@ -330,19 +339,27 @@ export class MatrixBoardService implements BoardAppService {
     }
   }
 
-  private async connect(session: MatrixSession): Promise<Workspace> {
-    const client = this.clientFactory({
-      baseUrl: this.homeserverUrl,
-      accessToken: session.accessToken,
-      userId: session.userId,
-      deviceId: session.deviceId,
-    });
+  private async connect(session: MatrixSession, generation: number): Promise<Workspace> {
     const storeName = cryptoDatabasePrefix(session);
-    const owner = activeCryptoStores.get(storeName);
-    if (owner) throw new Error('Matrix crypto store is already in use');
-    activeCryptoStores.set(storeName, this);
-    this.activeCryptoStore = storeName;
-    const generation = ++this.connectionGeneration;
+    const lease = await acquireCryptoStoreLease(this.cryptoStoreLocks, storeName);
+    if (generation !== this.connectionGeneration) {
+      lease.release();
+      await lease.settlement;
+      throw new Error('Matrix connection was disposed');
+    }
+    this.cryptoStoreLease = lease;
+    let client: ServiceMatrixClient;
+    try {
+      client = this.clientFactory({
+        baseUrl: this.homeserverUrl,
+        accessToken: session.accessToken,
+        userId: session.userId,
+        deviceId: session.deviceId,
+      });
+    } catch (error) {
+      await this.releaseCryptoStore();
+      throw error;
+    }
     this.pendingClient = client;
     let sync: ReturnType<typeof initialSync> | undefined;
     let stopped = false;
@@ -380,6 +397,7 @@ export class MatrixBoardService implements BoardAppService {
         this.pendingClient = null;
         this.client = client;
         this.gateway = new MatrixBoardGateway(client);
+        this.activeSession = session;
         this.observedEvents.clear();
         this.ignoredBackfillIds.clear();
         this.currentWorkspace = this.snapshot(session.userId);
@@ -392,6 +410,7 @@ export class MatrixBoardService implements BoardAppService {
         try { this.detachLiveListeners(); } catch (cleanupError) { cleanupFailures.push(cleanupError); }
         this.client = null;
         this.gateway = null;
+        this.activeSession = null;
         this.currentWorkspace = null;
         try { stop(); } catch (cleanupError) { cleanupFailures.push(cleanupError); }
         if (cleanupFailures.length) {
@@ -401,7 +420,7 @@ export class MatrixBoardService implements BoardAppService {
       } finally {
         if (this.pendingSync === sync) this.pendingSync = null;
         if (this.pendingClient === client) this.pendingClient = null;
-        if (!connected) this.releaseCryptoStore();
+        if (!connected) await this.releaseCryptoStore();
       }
     })();
     void lifecycle.catch(() => undefined);
@@ -442,17 +461,16 @@ export class MatrixBoardService implements BoardAppService {
       if (this.pendingConnection) await this.waitForSettlement(this.pendingConnection);
       const stored = await this.sessions.load();
       if (!stored) return null;
+      let session: MatrixSession;
       try {
-        const session = validateMatrixSession(stored);
-        if (generation !== this.connectionGeneration) throw new Error('Matrix authentication was disposed');
-        return await this.connect(session);
+        session = validateMatrixSession(stored);
       } catch (error) {
         const candidate = stored as Partial<MatrixSession>;
         const usableToken = typeof candidate.accessToken === 'string'
           && candidate.accessToken.trim().length > 0
           && !/[\u0000-\u001f\u007f]/u.test(candidate.accessToken);
         const results = await Promise.allSettled([
-          Promise.resolve().then(() => this.sessions.clear()),
+          Promise.resolve().then(() => this.sessions.clear(stored)),
           ...(usableToken ? [Promise.resolve().then(async () => {
             const authClient = this.clientFactory({
               baseUrl: this.homeserverUrl,
@@ -471,6 +489,8 @@ export class MatrixBoardService implements BoardAppService {
         }
         throw error;
       }
+      if (generation !== this.connectionGeneration) throw new Error('Matrix authentication was disposed');
+      return await this.connect(session, generation);
     } finally {
       this.authenticationInProgress = null;
       if (this.authenticationSettlement === authenticationSettlement) this.authenticationSettlement = null;
@@ -494,27 +514,33 @@ export class MatrixBoardService implements BoardAppService {
   private async performLogin(username: string, password: string, generation: number): Promise<Workspace> {
     const loginClient = this.clientFactory({ baseUrl: this.homeserverUrl });
     let response: { access_token: string; user_id: string; device_id: string } | undefined;
+    let issuedSession: MatrixSession | undefined;
+    let issuedRecord: Record<string, unknown> | undefined;
+    let sessionSaved = false;
     try {
       response = await loginClient.login('m.login.password', {
         identifier: { type: 'm.id.user', user: username },
         password,
         initial_device_display_name: 'Secure Board Browser',
       });
-      const session = validateMatrixSession({
+      issuedRecord = {
         accessToken: response.access_token,
         userId: response.user_id,
         deviceId: response.device_id,
-      });
-      await this.sessions.save(session);
+      };
+      issuedSession = validateMatrixSession(issuedRecord);
+      await this.sessions.save(issuedSession);
+      sessionSaved = true;
       if (generation !== this.connectionGeneration) throw new Error('Matrix authentication was disposed');
-      return await this.connect(session);
+      return await this.connect(issuedSession, generation);
     } catch (error) {
       if (!response) throw error;
+      if (sessionSaved && generation === this.connectionGeneration) throw error;
       const usableToken = typeof response.access_token === 'string'
         && response.access_token.trim().length > 0
         && !/[\u0000-\u001f\u007f]/u.test(response.access_token);
       const results = await Promise.allSettled([
-        Promise.resolve().then(() => this.sessions.clear()),
+        ...(issuedRecord ? [Promise.resolve().then(() => this.sessions.clear(issuedRecord))] : []),
         ...(usableToken ? [Promise.resolve().then(() => loginClient.logout())] : []),
       ]);
       const failures = results
@@ -534,22 +560,29 @@ export class MatrixBoardService implements BoardAppService {
     const generation = this.connectionGeneration;
     const authClient = this.clientFactory({ baseUrl: this.homeserverUrl });
     let response: { access_token: string; user_id: string; device_id: string } | undefined;
+    let issuedSession: MatrixSession | undefined;
+    let issuedRecord: Record<string, unknown> | undefined;
+    let sessionSaved = false;
     try {
       const registration = await registerWithToken(authClient, username, password, token);
       response = registration.response;
+      issuedRecord = {
+        accessToken: response.access_token,
+        userId: response.user_id,
+        deviceId: response.device_id,
+      };
       if (generation !== this.connectionGeneration) throw new Error('Matrix authentication was disposed');
       if (!registration.tokenAuthenticated) {
         throw new Error('Matrix registration completed without registration-token authentication');
       }
-      const session = validateMatrixSession({
-        accessToken: response.access_token,
-        userId: response.user_id,
-        deviceId: response.device_id,
-      });
-      await this.sessions.save(session);
-      return await this.connect(session);
+      issuedSession = validateMatrixSession(issuedRecord);
+      await this.sessions.save(issuedSession);
+      sessionSaved = true;
+      if (generation !== this.connectionGeneration) throw new Error('Matrix authentication was disposed');
+      return await this.connect(issuedSession, generation);
     } catch (error) {
       if (!response) throw error;
+      if (sessionSaved && generation === this.connectionGeneration) throw error;
       const accessToken = typeof response.access_token === 'string'
         && response.access_token.trim().length > 0
         && !/[\u0000-\u001f\u007f]/u.test(response.access_token)
@@ -557,7 +590,7 @@ export class MatrixBoardService implements BoardAppService {
         : null;
       const results = await Promise.allSettled([
         ...(accessToken ? [Promise.resolve().then(() => authClient.setAccessToken?.(accessToken))] : []),
-        Promise.resolve().then(() => this.sessions.clear()),
+        ...(issuedRecord ? [Promise.resolve().then(() => this.sessions.clear(issuedRecord))] : []),
         ...(accessToken ? [Promise.resolve().then(() => authClient.logout())] : []),
       ]);
       const failures = results
@@ -574,9 +607,11 @@ export class MatrixBoardService implements BoardAppService {
 
   async logout(): Promise<void> {
     const client = this.client;
+    const session = this.activeSession;
     this.detachLiveListeners();
     this.client = null;
     this.gateway = null;
+    this.activeSession = null;
     this.currentWorkspace = null;
     this.observedEvents.clear();
     this.ignoredBackfillIds.clear();
@@ -584,9 +619,9 @@ export class MatrixBoardService implements BoardAppService {
     const results = await Promise.allSettled([
       Promise.resolve().then(() => client?.logout(false)),
       Promise.resolve().then(() => client?.stopClient()),
-      Promise.resolve().then(() => this.sessions.clear()),
+      ...(session ? [Promise.resolve().then(() => this.sessions.clear(session))] : []),
     ]);
-    this.releaseCryptoStore();
+    await this.releaseCryptoStore();
     const failures = results
       .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
       .map((result) => result.reason);

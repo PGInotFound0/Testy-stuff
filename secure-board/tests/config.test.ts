@@ -48,4 +48,42 @@ describe('loadRuntimeConfig', () => {
 
     await expect(loadRuntimeConfig(fetcher)).rejects.toThrow('Homeserver URL must use HTTPS');
   });
+
+  it('surfaces a failed config response', async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: false, json: vi.fn() });
+    await expect(loadRuntimeConfig(fetcher)).rejects.toThrow('Unable to load /config.json');
+  });
+
+  it('surfaces invalid JSON', async () => {
+    const parseError = new SyntaxError('invalid JSON');
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockRejectedValue(parseError) });
+    await expect(loadRuntimeConfig(fetcher)).rejects.toBe(parseError);
+  });
+
+  it.each([
+    [null, 'Invalid runtime config'],
+    [{}, 'Invalid homeserver URL'],
+    [{ homeserverUrl: 42 }, 'Invalid homeserver URL'],
+    [{ homeserverUrl: 'not a URL' }, 'Invalid URL'],
+  ])('rejects malformed runtime config %#', async (value, message) => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => value });
+    await expect(loadRuntimeConfig(fetcher)).rejects.toThrow(message);
+  });
+
+  it.each(['localhost', '127.0.0.1', '[::1]'])(
+    'allows cleartext loopback homeservers for local development: %s',
+    async (host) => {
+      const homeserverUrl = `http://${host}:8008`;
+      const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ homeserverUrl }) });
+      await expect(loadRuntimeConfig(fetcher)).resolves.toEqual({ homeserverUrl });
+    },
+  );
+
+  it('does not mistake a loopback-looking domain for localhost', async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ homeserverUrl: 'http://127.0.0.1.example.org' }),
+    });
+    await expect(loadRuntimeConfig(fetcher)).rejects.toThrow('Homeserver URL must use HTTPS');
+  });
 });

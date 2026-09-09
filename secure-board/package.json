@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm run build && npm audit",
+    "test": "vitest run --maxWorkers=1 --no-file-parallelism",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
@@ -28,6 +29,6 @@
     "jsdom": "26.1.0",
     "typescript": "5.9.3",
     "vite": "7.3.6",
-    "vitest": "3.2.7"
+    "vitest": "^4.1.11"
   }
 }

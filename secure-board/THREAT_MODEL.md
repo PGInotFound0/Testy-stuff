@@ -20,11 +20,11 @@ Browser E2EE cannot defend against a malicious or compromised server delivering 
 
 ### Matrix metadata remains visible
 
-Matrix E2EE does not hide all metadata. Homeservers and relevant infrastructure can observe room IDs, membership and room state, user/device identifiers, sender and recipient relationships, event timing, frequency and approximate size, IP addresses, and federation routing. Private-room join rules are access control, not metadata anonymity. Secure Board is not an anonymity system and does not protect against traffic analysis.
+Matrix E2EE does not hide all metadata. Homeservers and relevant infrastructure can observe room IDs, membership and room state—including board names and any existing topics—user/device identifiers, sender and recipient relationships, event timing, frequency and approximate size, IP addresses, and federation routing. The “E2EE-message board” label applies to verified encrypted message events, not room names or other state. Private-room join rules are access control, not metadata anonymity. Secure Board is not an anonymity system and does not protect against traffic analysis.
 
 ### Local device and account compromise
 
-E2EE does not protect a device while it is unlocked and running hostile extensions, malware, injected scripts, or a compromised browser profile. IndexedDB data is same-origin accessible. Neither the access-token session record nor Matrix Rust crypto's IndexedDB state and device keys have application-level encryption with a user-held secret. Moving the token out of `localStorage` avoids common accidental access patterns, but it does not protect the token or crypto keys from same-origin script compromise. Logging out asks the homeserver to revoke the current access token, then clears the saved session and stops the local client even if revocation fails. A token stolen before logout remains outside this client's control; revoke suspect devices through another trusted Matrix client or the homeserver.
+E2EE does not protect a device while it is unlocked and running hostile extensions, malware, injected scripts, or a compromised browser profile. IndexedDB data is same-origin accessible. Neither the access-token session record nor Matrix Rust crypto's IndexedDB state and device keys have application-level encryption with a user-held secret. Moving the token out of `localStorage` avoids common accidental access patterns, but it does not protect the token or crypto keys from same-origin script compromise. Logging out asks the homeserver to revoke the current access token, then compare-and-deletes that exact saved session and stops the local client even if revocation fails; an older tab cannot erase a newer tab's login. Transient crypto or sync startup failures preserve validated saved sessions—including newly issued login and registration sessions—for retry. A token stolen before logout remains outside this client's control; revoke suspect devices through another trusted Matrix client or the homeserver.
 
 ### Registration and invitations
 
@@ -45,7 +45,7 @@ This UI does not yet expose cross-signing, device verification, key backup/recov
 - Configure CSP and other hardening headers at the static host.
 - Operate Synapse separately with timely security updates, restricted registration, backups, monitoring, and appropriate retention policies.
 - Keep the application origin and Synapse administration interfaces separated; never place admin credentials in this client.
-- A process-wide ownership guard prevents more than one active Matrix client instance from using a given SDK crypto IndexedDB store; clients must be stopped or disposed before ownership is released, as required by `matrix-js-sdk`.
+- An exclusive Web Lock prevents tabs and workers on this origin from concurrently using a given SDK crypto IndexedDB store; browsers without Web Locks fail closed. The lock remains held until the Matrix client has stopped or an in-flight, non-abortable SDK initialization has settled, as required by `matrix-js-sdk`.
 
 ## Not promised
 

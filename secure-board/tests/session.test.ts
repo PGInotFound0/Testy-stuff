@@ -53,4 +53,20 @@ describe('IndexedDbSessionStore', () => {
     expect(await store.load()).toBeNull();
     vi.unstubAllGlobals();
   });
+
+  it('does not clear a newer session written by another browser context', async () => {
+    const databaseName = `secure-board-session-race-${crypto.randomUUID()}`;
+    const first = new IndexedDbSessionStore(databaseName);
+    const second = new IndexedDbSessionStore(databaseName);
+    const oldSession = { accessToken: 'old', userId: '@old:example.org', deviceId: 'OLD' };
+    const newSession = { accessToken: 'new', userId: '@new:example.org', deviceId: 'NEW' };
+
+    await first.save(oldSession);
+    await second.save(newSession);
+    await first.clear(oldSession);
+    expect(await second.load()).toEqual(newSession);
+
+    await second.clear(newSession);
+    expect(await first.load()).toBeNull();
+  });
 });

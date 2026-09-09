@@ -14,6 +14,8 @@ export interface BoardPost extends BoardReply {
 export interface MatrixMessageEventLike {
   getId(): string | undefined;
   getType(): string;
+  getWireType(): string;
+  isEncrypted(): boolean;
   getContent(): unknown;
   getTs(): number;
   getSender(): string | undefined;
@@ -25,7 +27,10 @@ interface ParsedMessage extends BoardReply {
 }
 
 function parseMessage(event: MatrixMessageEventLike): ParsedMessage | null {
-  if (event.getType() !== 'm.room.message' || event.isRedacted()) return null;
+  if (event.getType() !== 'm.room.message'
+    || event.getWireType() !== 'm.room.encrypted'
+    || !event.isEncrypted()
+    || event.isRedacted()) return null;
   const id = event.getId();
   const content = event.getContent();
   if (!id || !content || typeof content !== 'object') return null;

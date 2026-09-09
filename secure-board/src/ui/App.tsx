@@ -197,8 +197,8 @@ export function App({ service }: { service: BoardAppService }) {
         <button className="quiet" onClick={logout}>Log out</button>
       </header>
       <aside aria-label="Private boards">
-        <h1>BOARDS</h1><p className="section-note">Joined invite-only rooms</p>
-        <form onSubmit={submitBoard}><label>Board name<input name="name" maxLength={80} required /></label><button disabled={creating}>{creating ? 'Creating…' : 'Create encrypted board'}</button></form>
+        <h1>BOARDS</h1><p className="section-note">Joined invite-only rooms · names are public metadata</p>
+        <form onSubmit={submitBoard}><label>Public board name<input name="name" maxLength={80} required /></label><button disabled={creating}>{creating ? 'Creating…' : 'Create E2EE-message board'}</button></form>
         <nav>{workspace.boards.map((board) => (
           <button key={board.id} className={selectedBoard?.id === board.id ? 'active' : ''} onClick={() => { setSelectedBoard(board); setSelectedPostId(null); }}>
             <span>{board.name}</span><small>{board.encrypted ? '● E2EE' : '⚠ BLOCKED'}</small>

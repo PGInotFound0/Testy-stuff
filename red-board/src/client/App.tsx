@@ -11,7 +11,7 @@ interface Me {
 
 function fmtDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("de-DE", {
+    return new Date(iso).toLocaleString("en-US", {
       day: "2-digit",
       month: "2-digit",
       hour: "2-digit",
@@ -37,14 +37,14 @@ function AuthScreen({ onDone }: { onDone: (me: Me) => void }) {
     try {
       if (mode === "signup") {
         const r = await authClient.signUp.email({ name: name.trim(), email: email.trim(), password });
-        if (r.error) throw new Error(r.error.message ?? "Registrierung fehlgeschlagen.");
+        if (r.error) throw new Error(r.error.message ?? "Sign-up failed.");
       } else {
         const r = await authClient.signIn.email({ email: email.trim(), password });
-        if (r.error) throw new Error(r.error.message ?? "Login fehlgeschlagen.");
+        if (r.error) throw new Error(r.error.message ?? "Sign-in failed.");
       }
       onDone(await api.me());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unbekannter Fehler.");
+      setError(err instanceof Error ? err.message : "Unknown error.");
     } finally {
       setBusy(false);
     }
@@ -53,10 +53,10 @@ function AuthScreen({ onDone }: { onDone: (me: Me) => void }) {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
-        <p className="kicker">Solidarisches Nachrichtenbrett</p>
-        <h1>ROTE TAFEL</h1>
+        <p className="kicker">Solidarity message board</p>
+        <h1>RED BOARD</h1>
         <p className="sub">
-          Kein Konzern. Kein Tracking. Nur Genoss:innen, Tafeln und klare Worte.
+          No corporations. No tracking. Just comrades, boards, and plain words.
         </p>
         <div className="tabs" role="tablist">
           <button
@@ -64,24 +64,24 @@ function AuthScreen({ onDone }: { onDone: (me: Me) => void }) {
             onClick={() => setMode("login")}
             type="button"
           >
-            ANMELDEN
+            SIGN IN
           </button>
           <button
             className={mode === "signup" ? "active" : ""}
             onClick={() => setMode("signup")}
             type="button"
           >
-            MITMACHEN
+            JOIN UP
           </button>
         </div>
         <form onSubmit={submit}>
           {mode === "signup" && (
             <label>
-              KAMPFNAME
+              FIGHT NAME
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="z. B. Rosi R."
+                placeholder="e.g. Rosa R."
                 required
                 minLength={2}
                 maxLength={60}
@@ -90,23 +90,23 @@ function AuthScreen({ onDone }: { onDone: (me: Me) => void }) {
             </label>
           )}
           <label>
-            E-MAIL
+            EMAIL
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               type="email"
-              placeholder="du@kollektiv.org"
+              placeholder="you@collective.org"
               required
               autoComplete="email"
             />
           </label>
           <label>
-            PASSWORT
+            PASSWORD
             <input
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               type="password"
-              placeholder="mind. 8 Zeichen"
+              placeholder="min. 8 characters"
               required
               minLength={8}
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
@@ -114,11 +114,11 @@ function AuthScreen({ onDone }: { onDone: (me: Me) => void }) {
           </label>
           {error && <p className="error">⚠ {error}</p>}
           <button className="primary" type="submit" disabled={busy}>
-            {busy ? "MOMENT …" : mode === "signup" ? "KONTO ERSTELLEN ✊" : "REIN DA ✊"}
+            {busy ? "ONE SEC …" : mode === "signup" ? "CREATE ACCOUNT ✊" : "GET IN THERE ✊"}
           </button>
         </form>
         <p className="hint">
-          Server-gehostet mit Login &amp; TLS — <strong>keine</strong> Ende-zu-Ende-Verschlüsselung.
+          Server-hosted with login &amp; TLS — <strong>no</strong> end-to-end encryption.
         </p>
       </div>
     </div>
@@ -148,11 +148,11 @@ function Thread({
       <p className="body">{post.body}</p>
       <div className="actions">
         <button type="button" onClick={() => onReply(post)}>
-          ↩ ANTWORTEN
+          ↩ REPLY
         </button>
         {canDelete && (
           <button type="button" className="danger" onClick={() => onDelete(post)}>
-            ✕ LÖSCHEN
+            ✕ DELETE
           </button>
         )}
       </div>
@@ -205,7 +205,7 @@ export function App() {
         return list[0] ?? null;
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Tafeln konnten nicht geladen werden.");
+      setError(err instanceof Error ? err.message : "Could not load boards.");
     }
   }, []);
 
@@ -218,7 +218,7 @@ export function App() {
     try {
       setPosts(await api.posts(activeBoard.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Beiträge konnten nicht geladen werden.");
+      setError(err instanceof Error ? err.message : "Could not load posts.");
     }
   }, [activeBoard]);
 
@@ -252,7 +252,7 @@ export function App() {
       await refreshBoards();
       setActiveBoard(b);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Tafel konnte nicht erstellt werden.");
+      setError(err instanceof Error ? err.message : "Could not create board.");
     }
   }
 
@@ -266,17 +266,17 @@ export function App() {
       setReplyTo(null);
       await refreshPosts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Senden fehlgeschlagen.");
+      setError(err instanceof Error ? err.message : "Send failed.");
     }
   }
 
   async function remove(post: Post) {
-    if (!window.confirm("Beitrag wirklich löschen?")) return;
+    if (!window.confirm("Really delete this post?")) return;
     try {
       await api.deletePost(post.id);
       await refreshPosts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen.");
+      setError(err instanceof Error ? err.message : "Delete failed.");
     }
   }
 
@@ -285,7 +285,7 @@ export function App() {
       setMembers(await api.members());
       setShowMembers((s) => !s);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Mitglieder konnten nicht geladen werden.");
+      setError(err instanceof Error ? err.message : "Could not load members.");
     }
   }
 
@@ -299,14 +299,14 @@ export function App() {
     setShowMembers(false);
   }
 
-  if (loading) return <div className="boot">ROTE TAFEL WIRD GELADEN …</div>;
+  if (loading) return <div className="boot">LOADING RED BOARD …</div>;
   if (!me) return <AuthScreen onDone={setMe} />;
 
   return (
     <div className="layout">
       <header className="topbar">
         <div className="brand">
-          <span className="star">★</span> ROTE TAFEL
+          <span className="star">★</span> RED BOARD
         </div>
         <div className="userbox">
           <span className="who">
@@ -314,7 +314,7 @@ export function App() {
             {me.admin && <em className="admin"> ADMIN</em>}
           </span>
           <button type="button" onClick={() => void logout()}>
-            RAUS
+            LOG OUT
           </button>
         </div>
       </header>
@@ -327,7 +327,7 @@ export function App() {
 
       <div className="main">
         <aside className="sidebar">
-          <h2>TAFELN</h2>
+          <h2>BOARDS</h2>
           <nav>
             {boards.map((b) => (
               <button
@@ -339,14 +339,14 @@ export function App() {
                 # {b.name.toUpperCase()}
               </button>
             ))}
-            {boards.length === 0 && <p className="empty">Noch keine Tafel. Eröffne eine!</p>}
+            {boards.length === 0 && <p className="empty">No boards yet. Open one!</p>}
           </nav>
           <form className="new-board" onSubmit={(e) => void createBoard(e)}>
-            <h3>NEUE TAFEL</h3>
+            <h3>NEW BOARD</h3>
             <input
               value={newBoardName}
               onChange={(e) => setNewBoardName(e.target.value)}
-              placeholder="Name, z. B. Streik-Org"
+              placeholder="Name, e.g. strike-org"
               required
               minLength={2}
               maxLength={80}
@@ -354,15 +354,15 @@ export function App() {
             <input
               value={newBoardDesc}
               onChange={(e) => setNewBoardDesc(e.target.value)}
-              placeholder="Worum geht's? (optional)"
+              placeholder="What's it about? (optional)"
               maxLength={500}
             />
             <button className="primary" type="submit">
-              + ERÖFFNEN
+              + OPEN
             </button>
           </form>
           <button type="button" className="ghost" onClick={() => void loadMembers()}>
-            {showMembers ? "MITGLIEDER VERBERGEN" : "WER IST DABEI? (MITGLIEDER)"}
+            {showMembers ? "HIDE MEMBERS" : "WHO'S HERE? (MEMBERS)"}
           </button>
           {showMembers && (
             <ul className="members">
@@ -396,14 +396,14 @@ export function App() {
                   />
                 ))}
                 {topLevel.length === 0 && (
-                  <p className="empty">Noch still hier. Mach den Anfang, Genoss:in!</p>
+                  <p className="empty">Still quiet here. Kick it off, comrade!</p>
                 )}
               </div>
               <form className="composer" onSubmit={(e) => void send(e)}>
                 {replyTo && (
                   <p className="reply-hint">
-                    ↩ Antwort an <strong>{replyTo.author_name}</strong>: „
-                    {replyTo.body.slice(0, 80)}“
+                    ↩ Reply to <strong>{replyTo.author_name}</strong>: “
+                    {replyTo.body.slice(0, 80)}”
                     <button type="button" onClick={() => setReplyTo(null)}>
                       ✕
                     </button>
@@ -412,24 +412,24 @@ export function App() {
                 <textarea
                   value={composer}
                   onChange={(e) => setComposer(e.target.value)}
-                  placeholder="Sag's klar und solidarisch … (Enter = Zeilenumbruch)"
+                  placeholder="Say it plain and solidary … (Enter = new line)"
                   rows={3}
                   maxLength={5000}
                 />
                 <button className="primary" type="submit" disabled={!composer.trim()}>
-                  ABSCHICKEN ✊
+                  POST IT ✊
                 </button>
               </form>
             </>
           ) : (
-            <p className="empty">Wähl links eine Tafel — oder eröffne eine neue.</p>
+            <p className="empty">Pick a board on the left — or open a new one.</p>
           )}
         </section>
       </div>
 
       <footer>
-        ROTE TAFEL · Server-gehostet (TLS + Login), <strong>kein</strong> Ende-zu-Ende-Verschlüsselung ·
-        Sprich offen, aber mit Verstand.
+        RED BOARD · Server-hosted (TLS + login), <strong>no</strong> end-to-end encryption ·
+        Speak openly, but with sense.
       </footer>
     </div>
   );

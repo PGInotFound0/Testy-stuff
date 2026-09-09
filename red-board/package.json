@@ -2,7 +2,7 @@
   "name": "red-board",
   "version": "0.1.0",
   "private": true,
-  "description": "Rote Tafel — server-hosted messaging board (Express + better-auth + SQLite, Vite + React frontend)",
+  "description": "Red Board — server-hosted messaging board (Express + better-auth + SQLite, Vite + React frontend)",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server/index.ts",

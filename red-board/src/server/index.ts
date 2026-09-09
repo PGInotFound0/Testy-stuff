@@ -9,7 +9,7 @@ const SECRET = process.env.BETTER_AUTH_SECRET ?? "";
 const DEV = process.env.NODE_ENV !== "production";
 
 if (!SECRET && !DEV) {
-  console.error("[red-board] FATAL: BETTER_AUTH_SECRET fehlt. Abbruch.");
+  console.error("[red-board] FATAL: BETTER_AUTH_SECRET is missing. Aborting.");
   process.exit(1);
 }
 
@@ -17,7 +17,7 @@ const dbPath = resolveDbPath(process.env.DB_PATH);
 const db = openDatabase(dbPath);
 const auth = createAuth(db, {
   baseURL: BASE_URL,
-  secret: SECRET || "dev-only-insecure-secret-mindestens-32-zeichen!!",
+  secret: SECRET || "dev-only-insecure-secret-at-least-32-chars!!",
 });
 
 async function start() {
@@ -29,14 +29,14 @@ async function start() {
     viteDev: DEV,
   });
   if (DEV) {
-    // Dev: Vite als Middleware — ein Prozess, ein Port.
+    // Dev: Vite as middleware — one process, one port.
     const { createServer } = await import("vite");
     const vite = await createServer({
       server: { middlewareMode: true },
       appType: "custom",
     });
     app.use(vite.middlewares);
-    // Fallback: index.html ausliefern
+    // Fallback: serve index.html
     app.get(/.*/, async (req, res, next) => {
       try {
         if (req.path.startsWith("/api")) return next();
@@ -52,11 +52,11 @@ async function start() {
   }
 
   app.listen(PORT, () => {
-    console.log(`[red-board] ✊ Rote Tafel läuft auf :${PORT} (DB: ${dbPath})`);
+    console.log(`[red-board] ✊ Red Board running on :${PORT} (DB: ${dbPath})`);
   });
 }
 
 start().catch((err) => {
-  console.error("[red-board] Start fehlgeschlagen:", err);
+  console.error("[red-board] Startup failed:", err);
   process.exit(1);
 });

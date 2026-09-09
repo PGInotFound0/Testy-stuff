@@ -31,7 +31,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(data.error ?? `Fehler ${res.status}`);
+  if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`);
   return data;
 }
 

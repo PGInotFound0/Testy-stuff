@@ -4,7 +4,7 @@ import { createApp } from "../src/server/app.js";
 import { createAuth, migrateAuth } from "../src/server/auth.js";
 import { openDatabase } from "../src/server/db.js";
 
-export const TEST_SECRET = "test-suite-secret-mindestens-32-zeichen!!";
+export const TEST_SECRET = "test-suite-secret-at-least-32-chars!!";
 
 export async function makeApp(): Promise<Express> {
   const db = openDatabase(":memory:");

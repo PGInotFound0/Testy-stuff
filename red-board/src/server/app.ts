@@ -47,7 +47,7 @@ function requireAuth(auth: Auth) {
     try {
       const user = await requireSession(req, auth);
       if (!user) {
-        res.status(401).json({ error: "Login erforderlich — erst anmelden, dann mitreden." });
+        res.status(401).json({ error: "Login required — sign in first, then join the discussion." });
         return;
       }
       (req as Request & { user: SessionUser }).user = user;
@@ -72,18 +72,18 @@ export function createApp(opts: AppOptions): express.Express {
     res.json({ ok: true, service: "red-board" });
   });
 
-  // --- BetterAuth (Login / Registrierung / Session-Cookies) ---
+  // --- BetterAuth (login / sign-up / session cookies) ---
   app.all("/api/auth/*", toNodeHandler(auth));
 
   const authed = requireAuth(auth);
 
-  // --- Aktuelle Nutzer:in ---
+  // --- Current user ---
   app.get("/api/me", authed, (req, res) => {
     const u = currentUser(req);
     res.json({ id: u.id, email: u.email, name: u.name, admin: isAdminEmail(u.email) });
   });
 
-  // --- Tafeln (Boards / Kanäle) ---
+  // --- Boards (channels) ---
   app.get("/api/boards", authed, (_req, res) => {
     const rows = db.prepare("SELECT * FROM boards ORDER BY name ASC").all() as Board[];
     res.json(rows);
@@ -94,12 +94,12 @@ export function createApp(opts: AppOptions): express.Express {
     const name = String(req.body?.name ?? "").trim();
     const description = String(req.body?.description ?? "").trim();
     if (name.length < 2 || name.length > 80) {
-      res.status(400).json({ error: "Name braucht 2–80 Zeichen." });
+      res.status(400).json({ error: "Name needs 2–80 characters." });
       return;
     }
     const exists = db.prepare("SELECT 1 FROM boards WHERE name = ?").get(name);
     if (exists) {
-      res.status(409).json({ error: "Diese Tafel gibt es schon." });
+      res.status(409).json({ error: "This board already exists." });
       return;
     }
     const board: Board = {
@@ -115,11 +115,11 @@ export function createApp(opts: AppOptions): express.Express {
     res.status(201).json(board);
   });
 
-  // --- Beiträge ---
+  // --- Posts ---
   app.get("/api/boards/:id/posts", authed, (req, res) => {
     const board = db.prepare("SELECT id FROM boards WHERE id = ?").get(req.params.id);
     if (!board) {
-      res.status(404).json({ error: "Tafel nicht gefunden." });
+      res.status(404).json({ error: "Board not found." });
       return;
     }
     const rows = db
@@ -133,13 +133,13 @@ export function createApp(opts: AppOptions): express.Express {
     const boardId = String(req.params.id);
     const board = db.prepare("SELECT id FROM boards WHERE id = ?").get(boardId);
     if (!board) {
-      res.status(404).json({ error: "Tafel nicht gefunden." });
+      res.status(404).json({ error: "Board not found." });
       return;
     }
     const body = String(req.body?.body ?? "").trim();
     const parentId = req.body?.parentId == null ? null : String(req.body.parentId);
     if (body.length < 1 || body.length > 5000) {
-      res.status(400).json({ error: "Beitrag braucht 1–5000 Zeichen." });
+      res.status(400).json({ error: "Post needs 1–5000 characters." });
       return;
     }
     if (parentId !== null) {
@@ -147,7 +147,7 @@ export function createApp(opts: AppOptions): express.Express {
         .prepare("SELECT id, board_id FROM posts WHERE id = ?")
         .get(parentId) as Pick<Post, "id" | "board_id"> | undefined;
       if (!parent || parent.board_id !== boardId) {
-        res.status(400).json({ error: "Antwort-Ziel ungültig." });
+        res.status(400).json({ error: "Invalid reply target." });
         return;
       }
     }
@@ -174,25 +174,25 @@ export function createApp(opts: AppOptions): express.Express {
     res.status(201).json(post);
   });
 
-  // --- Eigene Beiträge löschen (Autor:in oder Admin) ---
+  // --- Delete own posts (author or admin) ---
   app.delete("/api/posts/:id", authed, (req, res) => {
     const u = currentUser(req);
     const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(req.params.id) as
       | Post
       | undefined;
     if (!post) {
-      res.status(404).json({ error: "Beitrag nicht gefunden." });
+      res.status(404).json({ error: "Post not found." });
       return;
     }
     if (post.author_id !== u.id && !isAdminEmail(u.email)) {
-      res.status(403).json({ error: "Nur eigene Beiträge (oder Admins) können löschen." });
+      res.status(403).json({ error: "Only your own posts (or admins) can delete." });
       return;
     }
     db.prepare("DELETE FROM posts WHERE id = ?").run(req.params.id);
     res.json({ ok: true });
   });
 
-  // --- Mitgliederliste ---
+  // --- Member list ---
   app.get("/api/members", authed, (req, res) => {
     const u = currentUser(req);
     const admin = isAdminEmail(u.email);
@@ -220,8 +220,8 @@ export function createApp(opts: AppOptions): express.Express {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    console.error("[red-board] Fehler:", err);
-    res.status(500).json({ error: "Da ist was schiefgelaufen. Nochmal versuchen." });
+    console.error("[red-board] Error:", err);
+    res.status(500).json({ error: "Something went wrong. Try again." });
   });
 
   return app;

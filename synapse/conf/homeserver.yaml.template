@@ -1,0 +1,67 @@
+# Secure Board Synapse configuration template.
+# Rendered by entrypoint.py on every boot. TOKENS like %%SERVER_NAME%% are
+# substituted from the environment (first boot) and secret files in /data.
+# Every key here is validated against the pinned Synapse version with
+# `python -m synapse.config -c` before release.
+
+server_name: "%%SERVER_NAME%%"
+public_baseurl: "%%PUBLIC_BASEURL%%"
+pid_file: /data/homeserver.pid
+soft_file_limit: 0
+report_stats: false
+web_client: false
+
+# Single plain-HTTP listener. TLS is terminated by the Coolify reverse proxy
+# in front of this service; x_forwarded trusts its X-Forwarded-For headers.
+listeners:
+  - port: 8008
+    bind_addresses: ['::', '0.0.0.0']
+    type: http
+    x_forwarded: true
+    resources:
+      - names: [client]
+        compress: true
+
+database:
+  name: sqlite3
+  args:
+    database: /data/homeserver.db
+
+media_store_path: /data/media
+max_upload_size: 50M
+url_preview_enabled: false
+
+signing_key_path: "/data/%%SERVER_NAME%%.signing.key"
+suppress_key_server_warning: true
+trusted_key_servers:
+  - server_name: matrix.org
+
+# No federation in this increment: single-server deployment. An empty
+# whitelist means no domain is allowed to federate. (Port 8448 is also
+# never exposed, so there is no federation listener at all.)
+federation_domain_whitelist: []
+
+# Login with local passwords. Registration is open only to holders of a
+# registration token minted by the server admin (see ../README.md).
+password_config:
+  enabled: true
+  pepper: "%%PASSWORD_PEPPER%%"
+enable_registration: true
+registration_requires_token: true
+registration_shared_secret: "%%REGISTRATION_SHARED_SECRET%%"
+macaroon_secret_key: "%%MACAROON_SECRET_KEY%%"
+
+# No guest access; no user-directory search (invites target exact user IDs);
+# profile lookups require authentication; no identity-server lookups.
+allow_guest_access: false
+user_directory:
+  enabled: false
+require_auth_for_profile_requests: true
+enable_3pid_lookup: false
+
+# Access-token sessions do not expire server-side; the board client revokes
+# its token on logout. Keep IP metadata briefly.
+expire_access_token: false
+user_ips_max_age: 7d
+
+log_config: /conf/log.config

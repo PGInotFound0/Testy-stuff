@@ -14,11 +14,10 @@ name: secure-board-synapse
 services:
   synapse:
     build:
-      # NOTE: Coolify runs compose with --project-directory set to the repo
-      # root, so `context: .` would resolve to the root (where no Dockerfile
-      # exists). Keep this pointed at ./synapse and run local commands from
-      # the repo root (docker compose -f synapse/docker-compose.yml ...).
-      context: ./synapse
+      # NOTE: this file is deployed with the app's Base Directory set to
+      # /synapse, so `.` is the synapse/ folder (Dockerfile, conf/,
+      # entrypoint.py). Do NOT change this to ./synapse.
+      context: .
       dockerfile: Dockerfile
     image: secure-board-synapse:latest
     restart: unless-stopped

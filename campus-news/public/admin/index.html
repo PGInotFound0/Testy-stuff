@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redaktion — Campus News</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b0b0c">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230b0b0c'/><rect x='6' y='8' width='20' height='4' fill='%23ff3b1f'/><rect x='6' y='16' width='14' height='4' fill='%23f2f2ef'/><rect x='6' y='24' width='18' height='4' fill='%23f2f2ef'/></svg>">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin-body">
+
+<a class="skip" href="#main">Zum Inhalt springen</a>
+
+<header class="topbar">
+  <div class="topbar__left">
+    <a class="brand brand--small" href="/" title="Zur Website">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <span class="brand__text">
+        <span class="brand__name" style="font-size:20px">Campus<span class="brand__thin">News</span></span>
+        <span class="brand__sub">Redaktionsbereich</span>
+      </span>
+    </a>
+  </div>
+  <div class="topbar__right" id="topbar-right" hidden>
+    <span class="who" id="who"></span>
+    <button type="button" class="ghost" id="btn-password">Passwort ändern</button>
+    <a class="ghost" href="/" target="_blank" rel="noopener">Website ↗</a>
+    <button type="button" class="ghost ghost--warn" id="btn-logout">Abmelden</button>
+  </div>
+</header>
+
+<main id="main" class="admin-main">
+
+  <!-- ── Anmelden / Ersteinrichtung ─────────────────────────────── -->
+  <section id="view-auth" class="auth-wrap" hidden>
+    <div class="auth-card">
+      <p class="auth-kicker" id="auth-kicker">Redaktion</p>
+      <h1 class="auth-title" id="auth-title">Anmelden</h1>
+      <p class="auth-hint" id="auth-hint"></p>
+
+      <div class="alert" id="auth-alert" role="alert" hidden></div>
+
+      <form id="form-auth" novalidate>
+        <div class="field">
+          <label for="username">Benutzername</label>
+          <input id="username" name="username" autocomplete="username" required
+                 spellcheck="false" autocapitalize="none" placeholder="redaktion">
+        </div>
+
+        <div class="field">
+          <label for="password">Passwort</label>
+          <div class="pw">
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <button type="button" class="pw__toggle" id="pw-toggle"
+                    aria-label="Passwort anzeigen" aria-pressed="false">👁</button>
+          </div>
+        </div>
+
+        <div class="field" id="wrap-confirm" hidden>
+          <label for="password2">Passwort wiederholen</label>
+          <input id="password2" type="password" autocomplete="new-password">
+        </div>
+
+        <div class="pw-meter" id="pw-meter" hidden aria-hidden="true">
+          <div class="pw-meter__bar"><i></i></div>
+          <span class="pw-meter__label"></span>
+        </div>
+
+        <label class="check" id="wrap-remember">
+          <input type="checkbox" id="remember" checked>
+          <span>Angemeldet bleiben <span class="dim">(30 Tage, nicht für fremde Rechner)</span></span>
+        </label>
+
+        <button class="btn btn--primary btn--block" id="auth-submit" type="submit">Anmelden</button>
+      </form>
+
+      <p class="auth-foot"><a href="/">← Zurück zur Website</a></p>
+    </div>
+  </section>
+
+  <!-- ── Übersicht ──────────────────────────────────────────────── -->
+  <section id="view-dash" hidden>
+    <div class="dash-head">
+      <div>
+        <h1 class="page-title">Artikel</h1>
+        <p class="page-sub" id="dash-sub"></p>
+      </div>
+      <button class="btn btn--primary" id="btn-new" type="button">+ Neuer Artikel</button>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="toolbar">
+      <div class="filters" id="filters">
+        <button type="button" data-filter="alle" class="chip is-active">Alle</button>
+        <button type="button" data-filter="published" class="chip">Veröffentlicht</button>
+        <button type="button" data-filter="draft" class="chip">Entwürfe</button>
+      </div>
+      <div class="list-search">
+        <label class="sr-only" for="list-q">Artikel durchsuchen</label>
+        <input id="list-q" type="search" placeholder="Titel, Tag, Autor …" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="alert alert--soft" id="dash-alert" hidden></div>
+    <div id="list" class="list"></div>
+  </section>
+
+  <!-- ── Editor ─────────────────────────────────────────────────── -->
+  <section id="view-editor" hidden>
+    <div class="editor-head">
+      <div>
+        <h1 class="page-title" id="editor-title">Neuer Artikel</h1>
+        <p class="page-sub" id="editor-sub">Leerzeile im Text trennt Absätze.</p>
+      </div>
+      <div class="editor-actions">
+        <button class="btn ghost" id="btn-cancel" type="button">Abbrechen</button>
+        <button class="btn" id="btn-draft" type="button">Als Entwurf speichern</button>
+        <button class="btn btn--primary" id="btn-publish" type="button">Veröffentlichen</button>
+      </div>
+    </div>
+
+    <div class="alert" id="editor-alert" role="alert" hidden></div>
+
+    <div class="editor-grid">
+      <form class="editor-form" id="form-article" novalidate>
+        <div class="field">
+          <label for="f-title">Titel <span class="req">*</span></label>
+          <input id="f-title" name="title" required maxlength="220" placeholder="Worum geht es?">
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="f-category">Ressort <span class="req">*</span></label>
+            <select id="f-category" name="category"></select>
+          </div>
+          <div class="field">
+            <label for="f-date">Datum <span class="req">*</span></label>
+            <input id="f-date" name="date" type="date" required>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="f-author">Autor/in</label>
+            <input id="f-author" name="author" maxlength="80" placeholder="Redaktion" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="f-kicker">Rubrik-Zeile <span class="dim">(optional)</span></label>
+            <input id="f-kicker" name="kicker" maxlength="60" placeholder="z. B. MINT, Spielbericht" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="f-teaser">Teaser <span class="req">*</span></label>
+          <textarea id="f-teaser" name="teaser" rows="3" maxlength="600"
+                    placeholder="Ein bis zwei Sätze, die neugierig machen. Erscheint auf der Startseite."></textarea>
+          <div class="counter"><span id="teaser-count">0</span> / 600 Zeichen</div>
+        </div>
+
+        <div class="field">
+          <label for="f-body">Artikeltext <span class="req">*</span></label>
+          <textarea id="f-body" name="body" rows="16"
+                    placeholder="Erster Absatz …&#10;&#10;Zweiter Absatz … (Leerzeile trennt Absätze)"></textarea>
+          <div class="counter"><span id="body-count">0</span> Absätze · <span id="body-words">0</span> Wörter ·
+            ca. <span id="body-min">1</span> Min. Lesezeit</div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="f-tags">Tags <span class="dim">(mit Komma getrennt)</span></label>
+            <input id="f-tags" name="tags" placeholder="Robotik, Werkstatt, AG" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="f-status">Status</label>
+            <select id="f-status" name="status">
+              <option value="draft">Entwurf (nur intern sichtbar)</option>
+              <option value="published">Veröffentlicht (auf der Website)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Beitragsbild <span class="dim">(PNG, JPEG, WEBP oder GIF, max. 5 MB)</span></label>
+          <div class="drop" id="drop" tabindex="0" role="button"
+               aria-label="Bild auswählen oder hierher ziehen">
+            <div class="drop__inner">
+              <strong>Bild hierher ziehen</strong>
+              <span class="dim">oder klicken zum Auswählen</span>
+            </div>
+            <input type="file" id="f-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+          </div>
+          <div class="drop-preview" id="drop-preview" hidden>
+            <img id="drop-img" alt="Vorschau des Beitragsbilds">
+            <div class="drop-preview__meta">
+              <span id="drop-name"></span>
+              <button type="button" class="ghost ghost--warn" id="btn-image-remove">Bild entfernen</button>
+            </div>
+          </div>
+          <div class="drop-progress" id="drop-progress" hidden><i></i></div>
+        </div>
+
+        <div class="switches">
+          <label class="check">
+            <input type="checkbox" id="f-breaking">
+            <span>Eilmeldung <span class="dim">(erscheint im Ticker oben)</span></span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="f-featured">
+            <span>Aufmacher <span class="dim">(bevorzugt in der Hero-Zeile)</span></span>
+          </label>
+        </div>
+
+        <p class="kbd-hint dim">Tipp: <kbd>Strg</kbd>/<kbd>⌘</kbd> + <kbd>S</kbd> speichert, <kbd>Esc</kbd> schließt ohne zu speichern.</p>
+      </form>
+
+      <aside class="preview">
+        <h2 class="preview__title">Vorschau</h2>
+        <p class="preview__hint dim" id="preview-hint"></p>
+        <div class="preview__card" id="preview-card"></div>
+        <div class="preview__actions">
+          <button class="btn ghost" id="btn-preview" type="button">Auf der Website ansehen ↗</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<!-- ── Dialog: Passwort ändern ──────────────────────────────────── -->
+<div class="modal" id="modal-password" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__box" role="dialog" aria-modal="true" aria-labelledby="pw-modal-title">
+    <h2 id="pw-modal-title">Passwort ändern</h2>
+    <p class="dim">Nach dem Ändern werden alle anderen Anmeldungen abgemeldet.</p>
+    <div class="alert" id="pw-alert" hidden></div>
+    <div class="field">
+      <label for="pw-current">Aktuelles Passwort</label>
+      <input id="pw-current" type="password" autocomplete="current-password">
+    </div>
+    <div class="field">
+      <label for="pw-next">Neues Passwort</label>
+      <input id="pw-next" type="password" autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label for="pw-next2">Neues Passwort wiederholen</label>
+      <input id="pw-next2" type="password" autocomplete="new-password">
+    </div>
+    <div class="modal__actions">
+      <button class="btn ghost" data-close type="button">Abbrechen</button>
+      <button class="btn btn--primary" id="pw-save" type="button">Passwort speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Dialog: Löschen bestätigen ───────────────────────────────── -->
+<div class="modal" id="modal-delete" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__box" role="dialog" aria-modal="true" aria-labelledby="del-title">
+    <h2 id="del-title">Artikel löschen?</h2>
+    <p>Der Artikel <strong id="del-name"></strong> wird endgültig entfernt. Das lässt sich nicht rückgängig machen.</p>
+    <div class="modal__actions">
+      <button class="btn ghost" data-close type="button">Abbrechen</button>
+      <button class="btn btn--danger" id="del-confirm" type="button">Ja, löschen</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>

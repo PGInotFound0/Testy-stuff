@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus News — Campus Technicus Bernburg</title>
+<meta name="description" content="Campus News: Nachrichten, Projekte und Termine vom Campus Technicus Bernburg (Saale). Proof of Concept.">
+<meta name="theme-color" content="#0b0b0c">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230b0b0c'/><rect x='4' y='6' width='24' height='4' fill='%23ff3b1f'/><rect x='4' y='14' width='16' height='4' fill='%23f2f2ef'/><rect x='4' y='22' width='20' height='4' fill='%23f2f2ef'/></svg>">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Zum Inhalt springen</a>
+
+<div class="poc-bar" role="note">
+  <strong>PROOF OF CONCEPT</strong>
+  <span>Demo-Daten — alle Artikel sind fiktive Platzhalter, keine echten Meldungen.</span>
+</div>
+
+<header class="masthead">
+  <div class="wrap masthead__inner">
+    <a class="brand" href="#/" aria-label="Campus News Startseite">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <span class="brand__text">
+        <span class="brand__name">Campus<span class="brand__thin">News</span></span>
+        <span class="brand__sub">Campus Technicus · Bernburg (Saale)</span>
+      </span>
+    </a>
+
+    <div class="masthead__tools">
+      <form class="search" role="search" id="search-form">
+        <label class="sr-only" for="q">Artikel durchsuchen</label>
+        <input id="q" name="q" type="search" placeholder="Suchen — z. B. Robotik" autocomplete="off">
+        <button type="submit" aria-label="Suchen">↵</button>
+      </form>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-pressed="true" title="Hell/Dunkel umschalten">
+        <span aria-hidden="true">◐</span><span class="sr-only">Farbschema umschalten</span>
+      </button>
+    </div>
+  </div>
+
+  <nav class="nav" aria-label="Ressorts">
+    <div class="wrap nav__inner">
+      <ul class="nav__list" id="nav-list" role="list"></ul>
+      <span class="nav__date" id="nav-date"></span>
+    </div>
+  </nav>
+</header>
+
+<div class="ticker" id="ticker" hidden>
+  <div class="wrap ticker__inner">
+    <span class="ticker__label">EILMELDUNG</span>
+    <div class="ticker__track" id="ticker-track"></div>
+  </div>
+</div>
+
+<main id="main" class="wrap main">
+
+  <!-- Startseite -->
+  <section id="view-home" class="view">
+    <div class="hero" id="hero"></div>
+
+    <div class="section-head">
+      <h2 id="grid-title">Neueste Meldungen</h2>
+      <p class="section-head__meta" id="grid-count"></p>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <p class="empty" id="empty" hidden>Keine Treffer. Anderen Suchbegriff oder anderes Ressort probieren.</p>
+
+    <div class="more-wrap">
+      <button class="more" id="more" type="button" hidden>Mehr laden</button>
+    </div>
+  </section>
+
+  <!-- Einzelartikel -->
+  <section id="view-article" class="view" hidden>
+    <button class="back" id="back" type="button">← Zurück zur Übersicht</button>
+    <article class="article" id="article"></article>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__inner">
+    <div class="footer__col">
+      <p class="footer__brand">
+        <span class="brand__mark" aria-hidden="true"></span> Campus News
+      </p>
+      <p class="footer__note">Schülerzeitung / Newsroom als Proof of Concept.</p>
+    </div>
+    <div class="footer__col">
+      <h3>Schule</h3>
+      <address>
+        Campus Technicus Bernburg<br>
+        Käthe-Kollwitz-Str. 12–14<br>
+        06406 Bernburg (Saale)<br>
+        Standort 2: Leipziger Straße
+      </address>
+    </div>
+    <div class="footer__col">
+      <h3>Redaktion</h3>
+      <p>
+        Demo-Redaktion · Aula-Trakt<br>
+        <span class="dim">Redaktionsschluss: freitags, 5. Stunde</span>
+      </p>
+    </div>
+    <div class="footer__col">
+      <h3>Hinweis</h3>
+      <p class="dim">
+        Diese Seite ist ein Prototyp für einen Schul-Newsroom. Inhalte,
+        Ressorts und Kontakte sind Platzhalter und nicht redaktionell geprüft.
+      </p>
+    </div>
+  </div>
+  <div class="wrap footer__bar">
+    <span>© <span id="year"></span> Campus News — PoC</span>
+    <span>Keine Cookies · Kein Tracking · Statisch ausgeliefert</span>
+  </div>
+</footer>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

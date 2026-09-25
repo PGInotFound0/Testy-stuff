@@ -1,0 +1,16 @@
+{
+  "name": "campus-news",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Campus News — Nachrichten-PoC für den Campus Technicus Bernburg (Saale), mit Redaktions-Login und Artikel-Upload",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "dependencies": {},
+  "license": "MIT"
+}
